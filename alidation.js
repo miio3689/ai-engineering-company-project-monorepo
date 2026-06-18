@@ -58,6 +58,7 @@ if (form) {
   const locationSelect = document.getElementById('location');
   const birthDateField = document.getElementById('birthDate');
   let activeModal = null;
+  let skipNextResetCleanup = false;
 
   const fields = {
     fullName: document.getElementById('fullName'),
@@ -426,19 +427,20 @@ if (form) {
       return;
     }
 
-    window.alert(
-      getTranslation(
-        'successAlert',
-        '¡Bienvenido a Brasa Points!\n\nTu registro ha sido exitoso. Recibirás un email de confirmación en los próximos minutos con los detalles de tu cuenta y cómo empezar a acumular puntos.\n\n¡Ya puedes disfrutar de tus beneficios en cualquiera de nuestras 14 ubicaciones!'
-      )
-    );
+    skipNextResetCleanup = true;
     form.reset();
     updateCities();
     resetVisualState();
+    openModal(successModal);
   });
 
   form.addEventListener('reset', () => {
     window.requestAnimationFrame(() => {
+      if (skipNextResetCleanup) {
+        skipNextResetCleanup = false;
+        return;
+      }
+
       closeModal(successModal);
       updateCities();
       resetVisualState();
