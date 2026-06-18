@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registro Brasa Points | Brasaland</title>
+    <meta
+      name="description"
+      content="Regístrate en Brasa Points, el programa de fidelización digital de Brasaland para mayores de 18 años."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brasaPrimary: '#C2410C',
+              brasaAccent: '#5CB66C',
+              brasaInk: '#1F2937',
+              brasaCream: '#FFF7ED'
+            },
+            fontFamily: {
+              display: ['Sekuya', 'Bebas Neue', 'cursive'],
+              sans: ['Inter', 'sans-serif']
+            },
+            backgroundImage: {
+              ember: 'radial-gradient(circle at top left, rgba(194,65,12,0.16), transparent 32%), radial-gradient(circle at bottom right, rgba(92,182,108,0.14), transparent 24%)'
+            }
+          }
+        }
+      };
+    </script>
+  </head>
+  <body class="bg-brasaCream bg-ember font-sans text-brasaInk antialiased">
+    <a
+      href="#formulario-brasa-points"
+      class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-brasaAccent focus:px-4 focus:py-2 focus:font-semibold focus:text-brasaInk"
+    >
+      Saltar al formulario
+    </a>
+
+    <header class="border-b border-brasaPrimary/10 bg-brasaCream/90 backdrop-blur">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <a href="index.html" class="font-display text-3xl tracking-wide text-brasaPrimary">Brasaland</a>
+        <nav aria-label="Secundaria" class="flex items-center gap-4 text-sm font-semibold">
+          <a class="transition hover:text-brasaPrimary focus:text-brasaPrimary" href="index.html">Volver al inicio</a>
+          <a class="transition hover:text-brasaPrimary focus:text-brasaPrimary" href="#ayuda">Ayuda</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+      <div class="grid gap-10 lg:grid-cols-[0.92fr_1.08fr]">
+        <section class="rounded-[2rem] bg-brasaInk p-8 text-brasaCream shadow-2xl lg:p-10">
+          <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brasaAccent">Brasa Points</p>
+          <h1 class="mt-3 font-display text-5xl uppercase tracking-wide">Activa tu cuenta digital</h1>
+          <p class="mt-6 text-lg leading-8 text-brasaCream/90">
+            Regístrate en el programa de fidelización diseñado para clientes mayores de 18 años que quieren acumular puntos con sus visitas.
+          </p>
+          <ul class="mt-8 space-y-4 text-base leading-7 text-brasaCream/90">
+            <li>Acumula 1 punto por cada $10.000 COP o $5 USD.</li>
+            <li>Recibe beneficios exclusivos y descuentos.</li>
+            <li>Utiliza tu cuenta en cualquiera de nuestras 14 ubicaciones.</li>
+          </ul>
+          <p id="ayuda" class="mt-8 rounded-2xl bg-brasaCream/10 p-4 text-sm leading-6 text-brasaCream/85">
+            ¿Quieres hacer un pedido? Llama a tu ubicación favorita o visítanos directamente. ¡Pronto tendremos pedidos en línea!
+          </p>
+        </section>
+
+        <section class="rounded-[2rem] border border-brasaPrimary/10 bg-white/90 p-6 shadow-xl sm:p-8 lg:p-10">
+          <div class="mb-8">
+            <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brasaPrimary">Formulario de registro</p>
+            <h2 class="mt-3 font-display text-4xl uppercase tracking-wide text-brasaPrimary">Únete a Brasa Points</h2>
+            <p class="mt-4 leading-7 text-brasaInk/80">
+              Completa tu información para crear tu perfil de fidelización. Todos los campos marcados con * son obligatorios.
+            </p>
+          </div>
+
+          <div
+            id="success-message"
+            class="hidden rounded-[1.5rem] border border-brasaAccent/30 bg-brasaAccent/20 p-6 text-brasaInk"
+            role="status"
+            aria-live="polite"
+          >
+            <h3 class="text-xl font-extrabold">¡Bienvenido a Brasa Points!</h3>
+            <p class="mt-3 leading-7">
+              Tu registro ha sido exitoso. Recibirás un email de confirmación en los próximos minutos con los detalles de tu cuenta y cómo empezar a acumular puntos.
+            </p>
+            <p class="mt-3 leading-7">¡Ya puedes disfrutar de tus beneficios en cualquiera de nuestras 14 ubicaciones!</p>
+          </div>
+
+          <form id="formulario-brasa-points" novalidate class="mt-8 space-y-8">
+            <div class="grid gap-6 md:grid-cols-2">
+              <div>
+                <label for="fullName" class="mb-2 block text-sm font-semibold text-brasaInk">Nombre completo *</label>
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  autocomplete="name"
+                  class="w-full rounded-2xl border border-brasaPrimary/15 bg-brasaCream px-4 py-3 text-base text-brasaInk outline-none transition focus:border-brasaPrimary focus:ring-4 focus:ring-brasaPrimary/10"
+                  aria-describedby="fullName-error"
+                />
+                <p id="fullName-error" class="mt-2 hidden text-sm font-medium text-red-700" aria-live="polite"></p>
+              </div>
+
+              <div>
+                <label for="email" class="mb-2 block text-sm font-semibold text-brasaInk">Email *</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  class="w-full rounded-2xl border border-brasaPrimary/15 bg-brasaCream px-4 py-3 text-base text-brasaInk outline-none transition focus:border-brasaPrimary focus:ring-4 focus:ring-brasaPrimary/10"
+                  aria-describedby="email-error"
+                />
+                <p id="email-error" class="mt-2 hidden text-sm font-medium text-red-700" aria-live="polite"></p>
+              </div>
+
+              <div>
+                <label for="phone" class="mb-2 block text-sm font-semibold text-brasaInk">Teléfono *</label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  autocomplete="tel"
+                  placeholder="+57 300 123 4567"
+                  class="w-full rounded-2xl border border-brasaPrimary/15 bg-brasaCream px-4 py-3 text-base text-brasaInk outline-none transition focus:border-brasaPrimary focus:ring-4 focus:ring-brasaPrimary/10"
+                  aria-describedby="phone-error"
+                />
+                <p id="phone-error" class="mt-2 hidden text-sm font-medium text-red-700" aria-live="polite"></p>
+              </div>
+
+              <div>
+                <label for="birthDate" class="mb-2 block text-sm font-semibold text-brasaInk">Fecha de nacimiento *</label>
+                <input
+                  id="birthDate"
+                  name="birthDate"
+                  type="date"
+                  class="w-full rounded-2xl border border-brasaPrimary/15 bg-brasaCream px-4 py-3 text-base text-brasaInk outline-none transition focus:border-brasaPrimary focus:ring-4 focus:ring-brasaPrimary/10"
+                  aria-describedby="birthDate-error"
+                />
+                <p id="birthDate-error" class="mt-2 hidden text-sm font-medium text-red-700" aria-live="polite"></p>
+              </div>
+
+              <div>
+                <label for="country" class="mb-2 block text-sm font-semibold text-brasaInk">País *</label>
+                <select
+                  id="country"
+                  name="country"
+                  class="w-full rounded-2xl border border-brasaPrimary/15 bg-brasaCream px-4 py-3 text-base text-brasaInk outline-none transition focus:border-brasaPrimary focus:ring-4 focus:ring-brasaPrimary/10"
+                  aria-describedby="country-error"
+                >
+                  <option value="">Selecciona tu país</option>
+                  <option value="Colombia">Colombia</option>
+                  <option value="Estados Unidos">Estados Unidos</option>
+                </select>
+                <p id="country-error" class="mt-2 hidden text-sm font-medium text-red-700" aria-live="polite"></p>
+              </div>
+
+              <div>
+                <label for="city" class="mb-2 block text-sm font-semibold text-brasaInk">Ciudad *</label>
+                <select
+                  id="city"
+                  name="city"
+                  class="w-full rounded-2xl border border-brasaPrimary/15 bg-brasaCream px-4 py-3 text-base text-brasaInk outline-none transition focus:border-brasaPrimary focus:ring-4 focus:ring-brasaPrimary/10"
+                  aria-describedby="city-error"
+                  disabled
+                >
+                  <option value="">Selecciona tu ciudad</option>
+                </select>
+                <p id="city-error" class="mt-2 hidden text-sm font-medium text-red-700" aria-live="polite"></p>
+              </div>
+
+              <div class="md:col-span-2">
+                <label for="location" class="mb-2 block text-sm font-semibold text-brasaInk">Ubicación favorita de Brasaland</label>
+                <select
+                  id="location"
+                  name="location"
+                  class="w-full rounded-2xl border border-brasaPrimary/15 bg-brasaCream px-4 py-3 text-base text-brasaInk outline-none transition focus:border-brasaPrimary focus:ring-4 focus:ring-brasaPrimary/10"
+                  disabled
+                >
+                  <option value="">Selecciona una ubicación</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="discovery" class="mb-2 block text-sm font-semibold text-brasaInk">¿Cómo nos conociste? *</label>
+                <select
+                  id="discovery"
+                  name="discovery"
+                  class="w-full rounded-2xl border border-brasaPrimary/15 bg-brasaCream px-4 py-3 text-base text-brasaInk outline-none transition focus:border-brasaPrimary focus:ring-4 focus:ring-brasaPrimary/10"
+                  aria-describedby="discovery-error"
+                >
+                  <option value="">Selecciona una opción</option>
+                  <option value="Redes sociales">Redes sociales</option>
+                  <option value="Recomendación">Recomendación</option>
+                  <option value="Pasando por el local">Pasando por el local</option>
+                  <option value="Búsqueda en internet">Búsqueda en internet</option>
+                  <option value="Otro">Otro</option>
+                </select>
+                <p id="discovery-error" class="mt-2 hidden text-sm font-medium text-red-700" aria-live="polite"></p>
+              </div>
+
+              <fieldset>
+                <legend class="mb-2 block text-sm font-semibold text-brasaInk">Preferencias alimentarias</legend>
+                <div class="grid gap-3 rounded-[1.5rem] border border-brasaPrimary/10 bg-brasaCream p-4 sm:grid-cols-2">
+                  <label class="flex items-center gap-3 text-sm text-brasaInk/85"><input type="checkbox" name="preferences" value="Sin restricciones" class="h-4 w-4 rounded border-brasaPrimary/30 text-brasaPrimary focus:ring-brasaPrimary/30" />Sin restricciones</label>
+                  <label class="flex items-center gap-3 text-sm text-brasaInk/85"><input type="checkbox" name="preferences" value="Vegetariano" class="h-4 w-4 rounded border-brasaPrimary/30 text-brasaPrimary focus:ring-brasaPrimary/30" />Vegetariano</label>
+                  <label class="flex items-center gap-3 text-sm text-brasaInk/85"><input type="checkbox" name="preferences" value="Sin gluten" class="h-4 w-4 rounded border-brasaPrimary/30 text-brasaPrimary focus:ring-brasaPrimary/30" />Sin gluten</label>
+                  <label class="flex items-center gap-3 text-sm text-brasaInk/85"><input type="checkbox" name="preferences" value="Otro" class="h-4 w-4 rounded border-brasaPrimary/30 text-brasaPrimary focus:ring-brasaPrimary/30" />Otro</label>
+                </div>
+              </fieldset>
+            </div>
+
+            <div class="space-y-4 rounded-[1.5rem] border border-brasaPrimary/10 bg-brasaCream p-5">
+              <label class="flex items-start gap-3 text-sm leading-6 text-brasaInk/85">
+                <input
+                  id="terms"
+                  name="terms"
+                  type="checkbox"
+                  class="mt-1 h-4 w-4 rounded border-brasaPrimary/30 text-brasaPrimary focus:ring-brasaPrimary/30"
+                  aria-describedby="terms-error"
+                />
+                <span>Acepto términos del programa Brasa Points *</span>
+              </label>
+              <p id="terms-error" class="hidden text-sm font-medium text-red-700" aria-live="polite"></p>
+
+              <label class="flex items-start gap-3 text-sm leading-6 text-brasaInk/85">
+                <input
+                  id="offers"
+                  name="offers"
+                  type="checkbox"
+                  class="mt-1 h-4 w-4 rounded border-brasaPrimary/30 text-brasaPrimary focus:ring-brasaPrimary/30"
+                />
+                <span>Quiero recibir ofertas por email</span>
+              </label>
+            </div>
+
+            <div class="flex flex-col gap-4 sm:flex-row">
+              <button
+                type="submit"
+                class="inline-flex items-center justify-center rounded-full bg-brasaAccent px-7 py-4 text-base font-bold text-brasaInk transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-brasaAccent/35"
+              >
+                Completar registro
+              </button>
+              <button
+                type="reset"
+                class="inline-flex items-center justify-center rounded-full border border-brasaPrimary/20 bg-white px-7 py-4 text-base font-semibold text-brasaPrimary transition hover:border-brasaPrimary hover:bg-brasaCream focus:outline-none focus:ring-4 focus:ring-brasaPrimary/15"
+              >
+                Limpiar formulario
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </main>
+
+    <script src="alidation.js"></script>
+  </body>
+</html>

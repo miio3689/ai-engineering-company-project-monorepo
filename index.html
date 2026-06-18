@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brasaland | El sabor de la brasa, en cada bocado</title>
+    <meta
+      name="description"
+      content="Brasaland es una cadena de restaurantes de comida a la brasa con 14 ubicaciones en Colombia y Estados Unidos. Descubre Brasa Points y nuestras ubicaciones."
+    />
+    <meta
+      name="keywords"
+      content="Brasaland, restaurante a la brasa, Brasa Points, Medellín, Bogotá, Cali, Miami, Orlando"
+    />
+    <meta name="theme-color" content="#FFF7ED" />
+    <meta property="og:title" content="Brasaland | El sabor de la brasa, en cada bocado" />
+    <meta
+      property="og:description"
+      content="Desde 2008 sirviendo las mejores carnes a la brasa en Colombia y Estados Unidos."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://brasaland.com" />
+    <meta
+      property="og:image"
+      content="https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1200&q=80"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brasaPrimary: '#C2410C',
+              brasaAccent: '#5CB66C',
+              brasaInk: '#1F2937',
+              brasaCream: '#FFF7ED'
+            },
+            fontFamily: {
+              display: ['Sekuya', 'Bebas Neue', 'cursive'],
+              sans: ['Inter', 'sans-serif']
+            },
+            backgroundImage: {
+              ember: 'radial-gradient(circle at top left, rgba(194,65,12,0.16), transparent 32%), radial-gradient(circle at bottom right, rgba(92,182,108,0.14), transparent 24%)'
+            },
+            boxShadow: {
+              glow: '0 20px 60px rgba(194, 65, 12, 0.18)'
+            }
+          }
+        }
+      };
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Restaurant",
+        "name": "Brasaland",
+        "description": "Cadena de restaurantes de comida a la brasa en Colombia y Estados Unidos",
+        "url": "https://brasaland.com",
+        "foundingDate": "2008",
+        "servesCuisine": "Grilled food, Colombian cuisine",
+        "priceRange": "$$",
+        "address": [
+          {
+            "@type": "PostalAddress",
+            "addressCountry": "CO",
+            "addressLocality": "Medellín",
+            "addressRegion": "Antioquia"
+          },
+          {
+            "@type": "PostalAddress",
+            "addressCountry": "US",
+            "addressLocality": "Miami",
+            "addressRegion": "FL"
+          }
+        ],
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "telephone": "+57-4-123-4567",
+          "contactType": "customer service",
+          "availableLanguage": ["Spanish", "English"]
+        },
+        "sameAs": [
+          "https://instagram.com/brasaland",
+          "https://facebook.com/brasaland"
+        ]
+      }
+    </script>
+  </head>
+  <body class="bg-brasaCream font-sans text-brasaInk antialiased">
+    <a
+      href="#contenido-principal"
+      class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-brasaAccent focus:px-4 focus:py-2 focus:font-semibold focus:text-brasaInk"
+    >
+      Saltar al contenido principal
+    </a>
+
+    <header class="sticky top-0 z-40 border-b border-brasaPrimary/10 bg-brasaCream/90 backdrop-blur">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <a href="#inicio" class="font-display text-3xl tracking-wide text-brasaPrimary">Brasaland</a>
+        <div class="flex items-center gap-3 sm:gap-6">
+          <nav aria-label="Principal" class="hidden md:block">
+            <ul class="flex items-center gap-6 text-sm font-semibold">
+              <li><a class="transition hover:text-brasaPrimary focus:text-brasaPrimary" href="#inicio">Inicio</a></li>
+              <li><a class="transition hover:text-brasaPrimary focus:text-brasaPrimary" href="#ubicaciones">Ubicaciones</a></li>
+              <li><a class="transition hover:text-brasaPrimary focus:text-brasaPrimary" href="#menu">Menú</a></li>
+              <li><a class="transition hover:text-brasaPrimary focus:text-brasaPrimary" href="#brasa-points">Brasa Points</a></li>
+              <li><a class="transition hover:text-brasaPrimary focus:text-brasaPrimary" href="#contacto">Contacto</a></li>
+            </ul>
+          </nav>
+          <div class="flex items-center gap-2 rounded-full border border-brasaPrimary/15 bg-white/80 px-2 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-brasaInk">
+            <span aria-current="true" class="rounded-full bg-brasaPrimary px-2 py-1 text-brasaCream">ES</span>
+            <span class="px-2 py-1 text-brasaPrimary/70">EN</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="contenido-principal">
+      <section id="inicio" class="relative overflow-hidden bg-ember">
+        <div class="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 md:py-20 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-24">
+          <div class="flex flex-col justify-center">
+            <p class="mb-4 inline-flex w-fit rounded-full border border-brasaPrimary/20 bg-white/75 px-4 py-2 text-sm font-semibold text-brasaPrimary shadow-sm">
+              14 restaurantes entre Colombia y Estados Unidos
+            </p>
+            <h1 class="font-display text-5xl uppercase leading-none tracking-wide text-brasaPrimary sm:text-6xl lg:text-7xl">
+              El sabor de la brasa, en cada bocado
+            </h1>
+            <p class="mt-6 max-w-2xl text-lg leading-8 text-brasaInk/85 sm:text-xl">
+              Desde 2008 sirviendo las mejores carnes a la brasa en Colombia y Estados Unidos. 14 ubicaciones, una misma pasión por la calidad y el sabor.
+            </p>
+            <div class="mt-8 flex flex-col gap-4 sm:flex-row">
+              <a
+                href="application.html"
+                class="inline-flex items-center justify-center rounded-full bg-brasaAccent px-7 py-4 text-base font-bold text-brasaInk shadow-lg shadow-brasaAccent/20 transition hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-brasaAccent/35"
+              >
+                Únete a Brasa Points
+              </a>
+              <a
+                href="#ubicaciones"
+                class="inline-flex items-center justify-center rounded-full border border-brasaPrimary/25 bg-white/90 px-7 py-4 text-base font-semibold text-brasaPrimary transition hover:border-brasaPrimary hover:bg-white focus:outline-none focus:ring-4 focus:ring-brasaPrimary/15"
+              >
+                Ver ubicaciones
+              </a>
+            </div>
+            <p class="mt-6 rounded-2xl border border-brasaPrimary/10 bg-white/75 p-4 text-sm leading-6 text-brasaInk/85 shadow-sm">
+              ¿Quieres hacer un pedido? Llama a tu ubicación favorita o visítanos directamente. ¡Pronto tendremos pedidos en línea!
+            </p>
+          </div>
+
+          <div class="relative flex items-center justify-center">
+            <div class="absolute inset-0 rounded-[2rem] bg-gradient-to-br from-brasaPrimary/10 via-transparent to-brasaAccent/20 blur-3xl"></div>
+            <figure class="relative overflow-hidden rounded-[2rem] border border-white/50 bg-white p-3 shadow-glow">
+              <img
+                src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80"
+                alt="Parrilla con cortes de carne servidos en un restaurante Brasaland"
+                class="h-full w-full rounded-[1.4rem] object-cover"
+              />
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+        <div class="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+          <figure class="order-2 overflow-hidden rounded-[2rem] shadow-xl lg:order-1">
+            <img
+              src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80"
+              alt="Interior cálido de un restaurante familiar con servicio de mesa"
+              class="h-full w-full object-cover"
+            />
+          </figure>
+          <article class="order-1 lg:order-2">
+            <p class="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-brasaPrimary">Nuestra historia</p>
+            <h2 class="font-display text-4xl uppercase tracking-wide text-brasaPrimary sm:text-5xl">Tradición familiar con escala internacional</h2>
+            <p class="mt-6 text-lg leading-8 text-brasaInk/85">
+              Fundada en Medellín en 2008, Brasaland comenzó como un sueño familiar: compartir el auténtico sabor de la carne a la brasa con calidad constante y servicio cálido. Hoy somos 14 restaurantes en dos países, pero mantenemos la misma receta de éxito: productos frescos, técnicas tradicionales, y pasión por cada plato que servimos.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="bg-white/80 py-16 lg:py-20">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div class="max-w-2xl">
+            <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brasaPrimary">Lo que nos hace únicos</p>
+            <h2 class="mt-3 font-display text-4xl uppercase tracking-wide text-brasaPrimary sm:text-5xl">Una operación sólida, una experiencia cercana</h2>
+          </div>
+          <div class="mt-10 grid gap-6 md:grid-cols-3">
+            <article class="rounded-[1.75rem] border border-brasaPrimary/10 bg-brasaCream p-8 shadow-sm">
+              <h3 class="font-display text-3xl uppercase tracking-wide text-brasaPrimary">Calidad consistente</h3>
+              <ul class="mt-4 space-y-3 text-base leading-7 text-brasaInk/85">
+                <li>Mismas recetas y estándares en todos los locales.</li>
+                <li>Ingredientes frescos seleccionados diariamente.</li>
+              </ul>
+            </article>
+            <article class="rounded-[1.75rem] border border-brasaPrimary/10 bg-brasaCream p-8 shadow-sm">
+              <h3 class="font-display text-3xl uppercase tracking-wide text-brasaPrimary">Experiencia cálida</h3>
+              <ul class="mt-4 space-y-3 text-base leading-7 text-brasaInk/85">
+                <li>Servicio amable y atento.</li>
+                <li>Ambiente familiar en cada visita.</li>
+              </ul>
+            </article>
+            <article class="rounded-[1.75rem] border border-brasaPrimary/10 bg-brasaCream p-8 shadow-sm">
+              <h3 class="font-display text-3xl uppercase tracking-wide text-brasaPrimary">Rapidez</h3>
+              <ul class="mt-4 space-y-3 text-base leading-7 text-brasaInk/85">
+                <li>Tu comida lista en minutos.</li>
+                <li>Sin sacrificar sabor ni calidad.</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="ubicaciones" class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+        <div class="grid gap-8 lg:grid-cols-2">
+          <article class="rounded-[2rem] bg-brasaPrimary p-8 text-brasaCream shadow-xl">
+            <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brasaCream/75">Colombia</p>
+            <h2 class="mt-3 font-display text-4xl uppercase tracking-wide">10 restaurantes</h2>
+            <p class="mt-4 text-lg leading-8 text-brasaCream/90">Presencia en Medellín, Bogotá y Cali con una operación diseñada para servir con rapidez y consistencia.</p>
+            <dl class="mt-8 space-y-4 text-base">
+              <div>
+                <dt class="font-semibold text-brasaCream/80">Ciudades</dt>
+                <dd>Medellín, Bogotá y Cali</dd>
+              </div>
+              <div>
+                <dt class="font-semibold text-brasaCream/80">Horario</dt>
+                <dd>Lun-Dom 11:00 - 22:00</dd>
+              </div>
+            </dl>
+          </article>
+          <article class="rounded-[2rem] border border-brasaPrimary/10 bg-white p-8 shadow-xl">
+            <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brasaPrimary">Estados Unidos (Florida)</p>
+            <h2 class="mt-3 font-display text-4xl uppercase tracking-wide text-brasaPrimary">4 restaurantes</h2>
+            <p class="mt-4 text-lg leading-8 text-brasaInk/85">Un formato de expansión que mantiene la esencia de Brasaland en Miami y Orlando.</p>
+            <dl class="mt-8 space-y-4 text-base text-brasaInk/85">
+              <div>
+                <dt class="font-semibold text-brasaPrimary">Ciudades</dt>
+                <dd>Miami y Orlando</dd>
+              </div>
+              <div>
+                <dt class="font-semibold text-brasaPrimary">Horario</dt>
+                <dd>Mon-Sun 11:00 AM - 10:00 PM</dd>
+              </div>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <section id="menu" class="bg-white/80 py-16 lg:py-20">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div class="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+            <article>
+              <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brasaPrimary">Menú</p>
+              <h2 class="mt-3 font-display text-4xl uppercase tracking-wide text-brasaPrimary sm:text-5xl">Brasa, tradición y rapidez en un mismo menú</h2>
+              <p class="mt-6 text-lg leading-8 text-brasaInk/85">
+                Diseñamos una oferta enfocada en carnes a la brasa, acompañamientos clásicos, combos familiares y una operación capaz de responder con velocidad tanto en Colombia como en Florida.
+              </p>
+            </article>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="rounded-[1.5rem] border border-brasaPrimary/10 bg-brasaCream p-6">
+                <h3 class="font-display text-2xl uppercase tracking-wide text-brasaPrimary">Parrillas signature</h3>
+                <p class="mt-3 leading-7 text-brasaInk/80">Cortes seleccionados, pollo a la brasa y costillas con sabor constante en cada local.</p>
+              </div>
+              <div class="rounded-[1.5rem] border border-brasaPrimary/10 bg-brasaCream p-6">
+                <h3 class="font-display text-2xl uppercase tracking-wide text-brasaPrimary">Combos familiares</h3>
+                <p class="mt-3 leading-7 text-brasaInk/80">Opciones pensadas para compartir, con porciones generosas y servicio ágil.</p>
+              </div>
+              <div class="rounded-[1.5rem] border border-brasaPrimary/10 bg-brasaCream p-6 sm:col-span-2">
+                <h3 class="font-display text-2xl uppercase tracking-wide text-brasaPrimary">Acompañamientos y bebidas</h3>
+                <p class="mt-3 leading-7 text-brasaInk/80">Patacones, papas, arepas y bebidas para complementar la experiencia Brasaland sin perder velocidad de servicio.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="brasa-points" class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+        <div class="overflow-hidden rounded-[2rem] bg-brasaInk px-6 py-10 text-brasaCream shadow-2xl sm:px-10 lg:px-14">
+          <div class="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+            <article>
+              <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brasaAccent">Brasa Points</p>
+              <h2 class="mt-3 font-display text-4xl uppercase tracking-wide sm:text-5xl">Gana puntos con cada visita</h2>
+              <ul class="mt-6 space-y-4 text-lg leading-8 text-brasaCream/90">
+                <li>Acumula 1 punto por cada $10.000 COP o $5 USD.</li>
+                <li>Canjea tus puntos por descuentos y platos gratis.</li>
+                <li>Ofertas exclusivas para miembros.</li>
+                <li>Registro 100% digital, ya no más tarjetas de papel.</li>
+              </ul>
+            </article>
+            <aside class="rounded-[1.75rem] bg-brasaCream p-8 text-brasaInk">
+              <h3 class="font-display text-3xl uppercase tracking-wide text-brasaPrimary">Regístrate hoy</h3>
+              <p class="mt-4 leading-7 text-brasaInk/80">
+                Activa tu cuenta digital y empieza a acumular puntos en cualquiera de nuestras 14 ubicaciones.
+              </p>
+              <a
+                href="application.html"
+                class="mt-8 inline-flex w-full items-center justify-center rounded-full bg-brasaAccent px-6 py-4 text-base font-bold text-brasaInk transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-brasaAccent/35"
+              >
+                Ir al formulario
+              </a>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section id="contacto" class="bg-white/80 py-16 lg:py-20">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div class="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
+            <article>
+              <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brasaPrimary">Contacto</p>
+              <h2 class="mt-3 font-display text-4xl uppercase tracking-wide text-brasaPrimary sm:text-5xl">Conversemos</h2>
+              <dl class="mt-8 grid gap-6 sm:grid-cols-3">
+                <div class="rounded-[1.5rem] border border-brasaPrimary/10 bg-brasaCream p-6">
+                  <dt class="text-sm font-semibold uppercase tracking-[0.2em] text-brasaPrimary">Email</dt>
+                  <dd class="mt-3 text-base font-medium text-brasaInk/85"><a href="mailto:hola@brasaland.com">hola@brasaland.com</a></dd>
+                </div>
+                <div class="rounded-[1.5rem] border border-brasaPrimary/10 bg-brasaCream p-6">
+                  <dt class="text-sm font-semibold uppercase tracking-[0.2em] text-brasaPrimary">Colombia</dt>
+                  <dd class="mt-3 text-base font-medium text-brasaInk/85"><a href="tel:+5741234567">+57 4 123 4567</a></dd>
+                </div>
+                <div class="rounded-[1.5rem] border border-brasaPrimary/10 bg-brasaCream p-6">
+                  <dt class="text-sm font-semibold uppercase tracking-[0.2em] text-brasaPrimary">Florida</dt>
+                  <dd class="mt-3 text-base font-medium text-brasaInk/85"><a href="tel:+13051234567">+1 305 123 4567</a></dd>
+                </div>
+              </dl>
+            </article>
+            <a
+              href="application.html"
+              class="inline-flex items-center justify-center rounded-full border border-brasaPrimary/20 bg-brasaPrimary px-8 py-4 text-base font-bold text-brasaCream transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-brasaPrimary/20"
+            >
+              Registrar cuenta Brasa Points
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="border-t border-brasaPrimary/10 bg-brasaCream">
+      <div class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-brasaInk/75 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
+        <p>© 2025 Brasaland. Todos los derechos reservados.</p>
+        <nav aria-label="Redes sociales" class="flex gap-4 font-semibold text-brasaPrimary">
+          <a href="https://instagram.com/brasaland">Instagram</a>
+          <a href="https://facebook.com/brasaland">Facebook</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>
