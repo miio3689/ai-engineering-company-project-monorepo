@@ -1,29 +1,63 @@
 const cityOptions = {
-  Colombia: ['Medellín', 'Bogotá', 'Cali'],
-  'Estados Unidos': ['Miami', 'Orlando']
+  Colombia: {
+    es: [
+      { value: 'Medellín', label: 'Medellín' },
+      { value: 'Bogotá', label: 'Bogotá' },
+      { value: 'Cali', label: 'Cali' }
+    ],
+    en: [
+      { value: 'Medellín', label: 'Medellin' },
+      { value: 'Bogotá', label: 'Bogota' },
+      { value: 'Cali', label: 'Cali' }
+    ]
+  },
+  'Estados Unidos': {
+    es: [
+      { value: 'Miami', label: 'Miami' },
+      { value: 'Orlando', label: 'Orlando' }
+    ],
+    en: [
+      { value: 'Miami', label: 'Miami' },
+      { value: 'Orlando', label: 'Orlando' }
+    ]
+  }
 };
 
 const locationOptions = {
-  'Colombia|Medellín': [
-    'Brasaland El Poblado',
-    'Brasaland Laureles',
-    'Brasaland Envigado',
-    'Brasaland Sabaneta'
-  ],
-  'Colombia|Bogotá': ['Brasaland Usaquén', 'Brasaland Chapinero', 'Brasaland Zona Rosa'],
-  'Colombia|Cali': ['Brasaland Granada', 'Brasaland Ciudad Jardín', 'Brasaland Unicentro'],
-  'Estados Unidos|Miami': ['Brasaland Brickell', 'Brasaland Coral Gables'],
-  'Estados Unidos|Orlando': ['Brasaland Downtown', 'Brasaland International Drive']
+  'Colombia|Medellín': {
+    es: ['Brasaland El Poblado', 'Brasaland Laureles', 'Brasaland Envigado', 'Brasaland Sabaneta'],
+    en: ['Brasaland El Poblado', 'Brasaland Laureles', 'Brasaland Envigado', 'Brasaland Sabaneta']
+  },
+  'Colombia|Bogotá': {
+    es: ['Brasaland Usaquén', 'Brasaland Chapinero', 'Brasaland Zona Rosa'],
+    en: ['Brasaland Usaquen', 'Brasaland Chapinero', 'Brasaland Zona Rosa']
+  },
+  'Colombia|Cali': {
+    es: ['Brasaland Granada', 'Brasaland Ciudad Jardín', 'Brasaland Unicentro'],
+    en: ['Brasaland Granada', 'Brasaland Ciudad Jardin', 'Brasaland Unicentro']
+  },
+  'Estados Unidos|Miami': {
+    es: ['Brasaland Brickell', 'Brasaland Coral Gables'],
+    en: ['Brasaland Brickell', 'Brasaland Coral Gables']
+  },
+  'Estados Unidos|Orlando': {
+    es: ['Brasaland Downtown', 'Brasaland International Drive'],
+    en: ['Brasaland Downtown', 'Brasaland International Drive']
+  }
 };
 
 const form = document.getElementById('formulario-brasa-points');
 
 if (form) {
   const successMessage = document.getElementById('success-message');
+  const restrictionMessage = document.getElementById('restriction-message');
+  const successModal = document.getElementById('success-modal');
+  const restrictionModal = document.getElementById('restriction-modal');
   const countrySelect = document.getElementById('country');
   const citySelect = document.getElementById('city');
   const locationSelect = document.getElementById('location');
   const birthDateField = document.getElementById('birthDate');
+  let activeModal = null;
 
   const fields = {
     fullName: document.getElementById('fullName'),
@@ -37,15 +71,101 @@ if (form) {
   };
 
   const errorMessages = {
-    fullName: 'Ingresa tu nombre completo (nombre y apellido)',
-    email: 'Ingresa un email válido (ejemplo: nombre@correo.com)',
-    phone: 'El teléfono debe incluir código de país (ejemplo: +57 300 123 4567 o +1 305 123 4567)',
-    country: 'Selecciona tu país',
-    city: 'Selecciona tu ciudad',
-    discovery: 'Cuéntanos cómo conociste Brasaland',
-    birthDate: 'Debes ser mayor de 18 años para registrarte en Brasa Points',
-    terms: 'Debes aceptar los términos del programa Brasa Points para continuar'
+    es: {
+      fullName: 'Ingresa tu nombre completo (nombre y apellido)',
+      email: 'Ingresa un email válido (ejemplo: nombre@correo.com)',
+      phone: 'El teléfono debe incluir código de país (ejemplo: +57 300 123 4567 o +1 305 123 4567)',
+      country: 'Selecciona tu país',
+      city: 'Selecciona tu ciudad',
+      discovery: 'Cuéntanos cómo conociste Brasaland',
+      birthDate: 'Debes ser mayor de 18 años para registrarte en Brasa Points',
+      terms: 'Debes aceptar los términos del programa Brasa Points para continuar'
+    },
+    en: {
+      fullName: 'Enter your full name (first and last name)',
+      email: 'Enter a valid email address (example: name@email.com)',
+      phone: 'Phone number must include a country code (example: +57 300 123 4567 or +1 305 123 4567)',
+      country: 'Select your country',
+      city: 'Select your city',
+      discovery: 'Tell us how you heard about Brasaland',
+      birthDate: 'You must be over 18 to join Brasa Points',
+      terms: 'You must accept the Brasa Points program terms to continue'
+    }
   };
+
+  const selectText = {
+    es: {
+      selectCountry: 'Selecciona tu país',
+      selectCity: 'Selecciona tu ciudad',
+      selectLocation: 'Selecciona una ubicación',
+      selectDiscovery: 'Selecciona una opción',
+      countryColombia: 'Colombia',
+      countryUs: 'Estados Unidos',
+      discoverySocial: 'Redes sociales',
+      discoveryReferral: 'Recomendación',
+      discoveryWalkBy: 'Pasando por el local',
+      discoverySearch: 'Búsqueda en internet',
+      discoveryOther: 'Otro'
+    },
+    en: {
+      selectCountry: 'Select your country',
+      selectCity: 'Select your city',
+      selectLocation: 'Select a location',
+      selectDiscovery: 'Select an option',
+      countryColombia: 'Colombia',
+      countryUs: 'United States',
+      discoverySocial: 'Social media',
+      discoveryReferral: 'Referral',
+      discoveryWalkBy: 'Walked by the restaurant',
+      discoverySearch: 'Online search',
+      discoveryOther: 'Other'
+    }
+  };
+
+  function getCurrentLanguage() {
+    return window.BrasalandI18n ? window.BrasalandI18n.getLanguage() : 'es';
+  }
+
+  function getErrorMessage(fieldKey) {
+    return errorMessages[getCurrentLanguage()][fieldKey];
+  }
+
+  function getTranslation(key, fallback) {
+    if (!window.BrasalandI18n) {
+      return fallback;
+    }
+
+    const bundle = window.BrasalandI18n.getTranslations(getCurrentLanguage());
+    return bundle[key] || fallback;
+  }
+
+  function openModal(modal) {
+    if (!modal) {
+      return;
+    }
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    activeModal = modal;
+
+    const firstFocusable = modal.querySelector('button');
+    if (firstFocusable) {
+      firstFocusable.focus();
+    }
+  }
+
+  function closeModal(modal) {
+    if (!modal) {
+      return;
+    }
+
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+
+    if (activeModal === modal) {
+      activeModal = null;
+    }
+  }
 
   function fillSelect(select, placeholder, options) {
     select.innerHTML = '';
@@ -54,10 +174,15 @@ if (form) {
     placeholderOption.textContent = placeholder;
     select.appendChild(placeholderOption);
 
-    options.forEach((optionValue) => {
+    options.forEach((optionItem) => {
       const option = document.createElement('option');
-      option.value = optionValue;
-      option.textContent = optionValue;
+      if (typeof optionItem === 'string') {
+        option.value = optionItem;
+        option.textContent = optionItem;
+      } else {
+        option.value = optionItem.value;
+        option.textContent = optionItem.label;
+      }
       select.appendChild(option);
     });
   }
@@ -111,12 +236,12 @@ if (form) {
 
   function validateFullName() {
     const value = fields.fullName.value.trim().replace(/\s+/g, ' ');
-    return setFieldState(fields.fullName, value.split(' ').filter(Boolean).length >= 2, errorMessages.fullName);
+    return setFieldState(fields.fullName, value.split(' ').filter(Boolean).length >= 2, getErrorMessage('fullName'));
   }
 
   function validateEmail() {
     const value = fields.email.value.trim();
-    return setFieldState(fields.email, /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), errorMessages.email);
+    return setFieldState(fields.email, /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), getErrorMessage('email'));
   }
 
   function validatePhone() {
@@ -128,23 +253,38 @@ if (form) {
       (country === 'Estados Unidos' && value.startsWith('+1')) ||
       (!country && /^\+(57|1)/.test(value));
 
-    return setFieldState(fields.phone, formatOk && countryOk, errorMessages.phone);
+    return setFieldState(fields.phone, formatOk && countryOk, getErrorMessage('phone'));
   }
 
   function validateCountry() {
-    return setFieldState(fields.country, fields.country.value !== '', errorMessages.country);
+    return setFieldState(fields.country, fields.country.value !== '', getErrorMessage('country'));
   }
 
   function validateCity() {
-    return setFieldState(fields.city, fields.city.value !== '', errorMessages.city);
+    return setFieldState(fields.city, fields.city.value !== '', getErrorMessage('city'));
   }
 
   function validateDiscovery() {
-    return setFieldState(fields.discovery, fields.discovery.value !== '', errorMessages.discovery);
+    return setFieldState(fields.discovery, fields.discovery.value !== '', getErrorMessage('discovery'));
   }
 
   function validateBirthDate() {
-    return setFieldState(fields.birthDate, isAdult(fields.birthDate.value), errorMessages.birthDate);
+    const valid = isAdult(fields.birthDate.value);
+    const language = getCurrentLanguage();
+
+    if (restrictionMessage) {
+      if (!valid && fields.birthDate.value) {
+        const bundle = window.BrasalandI18n ? window.BrasalandI18n.getTranslations(language) : null;
+        const title = bundle ? bundle.restrictionTitle : 'Registro no disponible';
+        const body = bundle ? bundle.restrictionBody : 'El programa Brasa Points está diseñado para clientes mayores de 18 años que quieren acumular puntos con sus visitas. No es un formulario de reservas ni de pedidos en línea.';
+        restrictionMessage.innerHTML = `<h3 class="text-base font-extrabold">${title}</h3><p class="mt-2 text-sm leading-6">${body}</p>`;
+        openModal(restrictionModal);
+      } else {
+        closeModal(restrictionModal);
+      }
+    }
+
+    return setFieldState(fields.birthDate, valid, getErrorMessage('birthDate'));
   }
 
   function validateTerms() {
@@ -155,7 +295,7 @@ if (form) {
 
     if (!fields.terms.checked) {
       fields.terms.setAttribute('aria-invalid', 'true');
-      errorElement.textContent = errorMessages.terms;
+      errorElement.textContent = getErrorMessage('terms');
       errorElement.classList.remove('hidden');
       return false;
     }
@@ -165,20 +305,46 @@ if (form) {
 
   function updateCities() {
     const country = countrySelect.value;
-    const cities = cityOptions[country] || [];
+    const language = getCurrentLanguage();
+    const cities = (cityOptions[country] && cityOptions[country][language]) || [];
 
-    fillSelect(citySelect, 'Selecciona tu ciudad', cities);
+    fillSelect(citySelect, selectText[language].selectCity, cities);
     citySelect.disabled = cities.length === 0;
-    fillSelect(locationSelect, 'Selecciona una ubicación', []);
+    fillSelect(locationSelect, selectText[language].selectLocation, []);
     locationSelect.disabled = true;
   }
 
   function updateLocations() {
     const key = `${countrySelect.value}|${citySelect.value}`;
-    const locations = locationOptions[key] || [];
+    const language = getCurrentLanguage();
+    const locations = ((locationOptions[key] && locationOptions[key][language]) || []).map((label, index) => {
+      const fallbackValue = (locationOptions[key].es || [])[index] || label;
+      return { value: fallbackValue, label };
+    });
 
-    fillSelect(locationSelect, 'Selecciona una ubicación', locations);
+    fillSelect(locationSelect, selectText[language].selectLocation, locations);
     locationSelect.disabled = locations.length === 0;
+  }
+
+  function updateStaticSelects() {
+    const language = getCurrentLanguage();
+    const currentCountry = countrySelect.value;
+    const currentDiscovery = fields.discovery.value;
+
+    fillSelect(countrySelect, selectText[language].selectCountry, [
+      { value: 'Colombia', label: selectText[language].countryColombia },
+      { value: 'Estados Unidos', label: selectText[language].countryUs }
+    ]);
+    countrySelect.value = currentCountry;
+
+    fillSelect(fields.discovery, selectText[language].selectDiscovery, [
+      { value: 'Redes sociales', label: selectText[language].discoverySocial },
+      { value: 'Recomendación', label: selectText[language].discoveryReferral },
+      { value: 'Pasando por el local', label: selectText[language].discoveryWalkBy },
+      { value: 'Búsqueda en internet', label: selectText[language].discoverySearch },
+      { value: 'Otro', label: selectText[language].discoveryOther }
+    ]);
+    fields.discovery.value = currentDiscovery;
   }
 
   function validateForm() {
@@ -204,11 +370,29 @@ if (form) {
       element.textContent = '';
       element.classList.add('hidden');
     });
+
+    if (restrictionMessage) {
+      closeModal(restrictionModal);
+    }
+
+    closeModal(successModal);
   }
 
   const adultLimit = new Date();
   adultLimit.setFullYear(adultLimit.getFullYear() - 18);
   birthDateField.max = adultLimit.toISOString().split('T')[0];
+
+  document.addEventListener('brasaland:languagechange', () => {
+    const currentCity = citySelect.value;
+    const currentLocation = locationSelect.value;
+
+    updateStaticSelects();
+    updateCities();
+    citySelect.value = currentCity;
+    updateLocations();
+    locationSelect.value = currentLocation;
+    validateBirthDate();
+  });
 
   countrySelect.addEventListener('change', () => {
     updateCities();
@@ -230,7 +414,7 @@ if (form) {
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    successMessage.classList.add('hidden');
+    closeModal(successModal);
 
     if (!validateForm()) {
       const firstInvalidField = form.querySelector('[aria-invalid="true"]');
@@ -242,20 +426,38 @@ if (form) {
       return;
     }
 
-    successMessage.classList.remove('hidden');
+    window.alert(
+      getTranslation(
+        'successAlert',
+        '¡Bienvenido a Brasa Points!\n\nTu registro ha sido exitoso. Recibirás un email de confirmación en los próximos minutos con los detalles de tu cuenta y cómo empezar a acumular puntos.\n\n¡Ya puedes disfrutar de tus beneficios en cualquiera de nuestras 14 ubicaciones!'
+      )
+    );
     form.reset();
     updateCities();
     resetVisualState();
-    successMessage.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   form.addEventListener('reset', () => {
     window.requestAnimationFrame(() => {
-      successMessage.classList.add('hidden');
+      closeModal(successModal);
       updateCities();
       resetVisualState();
     });
   });
 
+  document.querySelectorAll('[data-modal-close]').forEach((element) => {
+    element.addEventListener('click', () => {
+      const modal = document.getElementById(element.dataset.modalClose);
+      closeModal(modal);
+    });
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && activeModal) {
+      closeModal(activeModal);
+    }
+  });
+
+  updateStaticSelects();
   updateCities();
 }
