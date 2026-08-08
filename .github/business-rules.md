@@ -2,221 +2,185 @@
 
 ## Objetivo
 
-Este documento define las reglas de negocio que deben cumplirse durante el procesamiento de la información de Brasaland.
+Este documento define las reglas de negocio que deben cumplirse durante la gestión del proceso de selección de Brasaland.
 
-Estas reglas son independientes de la implementación y representan las restricciones funcionales del dominio. Todas las validaciones deberán respetarlas.
+Estas reglas son independientes de la implementación y representan las restricciones funcionales del dominio. Todas las validaciones y operaciones de la aplicación deberán respetarlas.
 
 ---
 
-## MenuItem
+## Candidate
 
 ### Descripción
 
-Un **MenuItem** representa un producto disponible en el menú de Brasaland.
+Un **Candidate** representa una candidatura registrada en el proceso de selección de Brasaland.
 
 ### Reglas de negocio
 
-* El nombre del producto no puede estar vacío.
-* El precio en USD debe ser mayor que cero.
-* El precio en COP debe ser mayor que cero.
-* El coste de ingredientes en USD debe ser mayor que cero.
-* El coste de ingredientes en COP debe ser mayor que cero.
-* El tiempo de preparación debe ser mayor que 0 minutos.
-* El tiempo de preparación no puede superar los 60 minutos.
-* El producto debe estar disponible al menos en uno de los dos países.
-* El estado del producto debe pertenecer a los valores permitidos.
+* Todo candidato debe tener un nombre.
+* Todo candidato debe tener un correo electrónico válido.
+* El puesto no puede estar vacío.
+* El estado debe pertenecer a los valores permitidos.
+* La etapa debe pertenecer a los valores permitidos.
+* La fecha de aplicación debe conservarse correctamente.
+* Los años de experiencia no podrán ser negativos.
+* Los enlaces proporcionados (LinkedIn y CV) deberán ser válidos cuando existan.
 
 ---
 
-## SaleTransaction
+## Estados de candidatura
 
 ### Descripción
 
-Una **SaleTransaction** representa una venta realizada en un restaurante.
+El estado representa la situación general de una candidatura dentro del proceso de selección.
+
+### Valores permitidos por la API
+
+* `received`
+* `in_progress`
+* `selected`
+* `discarded`
 
 ### Reglas de negocio
 
-* La cantidad vendida debe ser mayor que cero.
-* El importe total en USD debe ser mayor que cero.
-* El importe total en COP debe ser mayor que cero.
-* El nombre del empleado que realizó la venta no puede estar vacío.
-* Toda venta debe estar asociada a una locación existente.
-* Toda venta debe estar asociada a un producto existente.
+* Los valores de la API nunca deberán mostrarse directamente al usuario.
+* La interfaz deberá utilizar siempre las siguientes etiquetas:
+
+| Valor API   | Etiqueta     |
+| ----------- | ------------ |
+| received    | Recibida     |
+| in_progress | En proceso   |
+| selected    | Seleccionada |
+| discarded   | Descartada   |
 
 ---
 
-## Location
+## Etapas del proceso
 
 ### Descripción
 
-Una **Location** representa un restaurante de Brasaland.
+La etapa representa el punto del proceso de selección en el que se encuentra una candidatura.
+
+### Valores permitidos por la API
+
+* `pending`
+* `review`
+* `personal_interview`
+* `technical_interview`
+* `offer_presented`
 
 ### Reglas de negocio
 
-* El año de apertura debe ser igual o posterior a 2008.
-* El año de apertura no puede ser posterior al año actual.
-* La capacidad del restaurante debe ser mayor que cero.
-* El número de empleados debe ser mayor que cero.
-* El coste mensual del alquiler debe ser mayor que cero en ambas monedas.
-* El coste medio mensual de suministros debe ser mayor que cero en ambas monedas.
-* El nombre del gerente no puede estar vacío.
-* El estado de la locación debe pertenecer a los valores permitidos.
+* Los valores internos de la API nunca deberán mostrarse al usuario.
+* La interfaz utilizará siempre las siguientes etiquetas:
+
+| Valor API           | Etiqueta              |
+| ------------------- | --------------------- |
+| pending             | Pendiente de revisión |
+| review              | En revisión           |
+| personal_interview  | Entrevista personal   |
+| technical_interview | Entrevista técnica    |
+| offer_presented     | Oferta presentada     |
 
 ---
 
-## WasteRecord
+## Notas internas
 
 ### Descripción
 
-Un **WasteRecord** representa un registro de desperdicio de alimentos.
+Las notas permiten registrar información interna sobre cada candidato.
 
 ### Reglas de negocio
 
-* La cantidad desperdiciada debe ser mayor que cero.
-* El coste del desperdicio debe ser mayor que cero en ambas monedas.
-* El empleado que registra el desperdicio no puede estar vacío.
-* Toda incidencia debe estar asociada a una locación existente.
-* Toda incidencia debe estar asociada a un producto existente.
-* El motivo del desperdicio debe pertenecer a los valores permitidos.
+* Toda nota deberá estar asociada a un único candidato.
+* Las notas únicamente serán visibles desde la página de detalle del candidato.
+* Las notas podrán añadirse y eliminarse.
+* La eliminación de una nota no deberá afectar al resto de información del candidato.
 
 ---
 
-## Conversión de moneda
+## Registro de candidaturas
 
-### Tasa de cambio
+### Reglas de negocio
 
-Todas las conversiones deberán utilizar una tasa fija.
-
-```text
-1 USD = 4000 COP
-```
-
-### Reglas
-
-* Si la moneda de origen y destino son iguales, no debe realizarse ninguna conversión.
-* Todos los resultados deberán redondearse a dos decimales.
+* Antes de enviar una candidatura deberán validarse todos los campos obligatorios.
+* No deberá enviarse información incompleta a la API.
+* Tras un registro correcto, la interfaz deberá reflejar inmediatamente el nuevo candidato.
+* Si el registro falla, el usuario deberá recibir un mensaje de error claro.
 
 ---
 
-## Cálculo del margen
+## Edición de candidaturas
 
-### Fórmula
+### Reglas de negocio
 
-El margen de beneficio de una locación se calcula mediante la siguiente expresión:
-
-```text
-((Ingreso Total - Coste Total de Ingredientes) / Ingreso Total) × 100
-```
-
-### Reglas
-
-* Solo deben utilizarse las ventas pertenecientes a la locación evaluada.
-* El coste de ingredientes debe obtenerse a partir del `MenuItem` correspondiente.
-* El resultado se expresará como un porcentaje.
-* El resultado se redondeará a dos decimales.
+* Solo podrán modificarse los datos permitidos por la API.
+* Antes del envío deberán validarse nuevamente los datos.
+* Tras una modificación correcta, la información visible deberá actualizarse sin recargar la página.
 
 ---
 
-## Cálculo del rendimiento de una locación
+## Actualización de estado y etapa
 
-### Puntuación máxima
+### Reglas de negocio
 
-La puntuación total será un valor comprendido entre **0 y 100**.
-
-### Distribución
-
-#### Rendimiento económico
-
-* Máximo: **40 puntos**.
-
-Se calcula utilizando el ingreso medio diario de la locación.
+* Estado y etapa podrán modificarse de forma independiente.
+* Toda actualización deberá realizarse mediante la API.
+* Tras una actualización correcta, la interfaz deberá mostrar inmediatamente el nuevo valor.
+* Si la operación falla, deberá mostrarse un mensaje de error.
 
 ---
 
-#### Eficiencia
+## Búsqueda y filtros
 
-* Máximo: **30 puntos**.
+### Reglas de negocio
 
-Se calcula utilizando la relación entre el número de ventas y la capacidad del restaurante.
-
----
-
-#### Control del desperdicio
-
-* Máximo: **20 puntos**.
-
-Cuanto menor sea el porcentaje de desperdicio respecto a los ingresos, mayor será la puntuación obtenida.
-
-La puntuación mínima será **0**.
+* La búsqueda deberá realizarse por nombre o correo electrónico.
+* Los filtros deberán aplicarse sin recargar la página.
+* Deberá ser posible combinar filtro por estado y filtro por etapa.
+* Los filtros deberán conservarse durante la navegación siempre que sea posible mediante los parámetros de la URL.
 
 ---
 
-#### Margen de beneficio
+## Comunicación con la API
 
-* Máximo: **10 puntos**.
+### Reglas de negocio
 
-Se obtiene a partir del margen calculado para la locación.
+Todas las operaciones deberán realizarse de forma asíncrona utilizando `async/await`.
 
----
+Cada petición deberá gestionar correctamente tres estados:
 
-## Reportes
+* Cargando.
+* Éxito.
+* Error.
 
-### Conteo por método de pago
-
-Los reportes deberán indicar el número de ventas realizadas mediante cada método de pago.
-
----
-
-### Ticket medio
-
-El ticket medio deberá calcularse utilizando la moneda seleccionada.
-
-El resultado se redondeará a dos decimales.
+La aplicación nunca deberá fallar silenciosamente ni dejar al usuario sin información sobre el resultado de la operación.
 
 ---
 
-### Productos más vendidos
+## Navegación
 
-Los productos deberán ordenarse de mayor a menor según la cantidad total vendida.
+### Reglas de negocio
 
----
-
-### Agrupación de desperdicios
-
-Los registros deberán agruparse según el motivo del desperdicio.
-
----
-
-### Comparativa por país
-
-Las métricas deberán calcularse de forma independiente para:
-
-* Colombia
-* USA
-
-Cada país deberá incluir:
-
-* Número total de locaciones.
-* Ingresos totales.
-* Ingreso medio por locación.
-* Número total de ventas.
+* La navegación entre el listado y el detalle utilizará el sistema de rutas de Next.js.
+* No deberán producirse recargas completas de la página.
+* Al regresar desde el detalle deberá mantenerse el contexto del listado siempre que sea posible.
 
 ---
 
 ## Reglas generales
 
-Todas las funciones del proyecto deberán cumplir las siguientes normas:
+Toda la aplicación deberá cumplir las siguientes normas:
 
-* No modificar los datos recibidos por parámetro, salvo que se indique expresamente.
-* Trabajar correctamente con colecciones vacías.
-* Manejar correctamente datos inválidos.
-* Devolver siempre el tipo especificado.
-* Mantener un comportamiento determinista.
-* Utilizar funciones puras siempre que sea posible.
-* Mantener la coherencia entre USD y COP en todos los cálculos financieros.
+* Mantener la coherencia entre la información mostrada y los datos recibidos desde la API.
+* No mostrar nunca los valores internos de la API al usuario.
+* No modificar directamente los datos recibidos desde la API.
+* Gestionar correctamente errores de red y respuestas inválidas.
+* Mantener una interfaz consistente tras cualquier operación de creación, edición, actualización o eliminación.
+* Utilizar componentes reutilizables siempre que sea posible.
+* Mantener una experiencia de usuario clara mediante estados de carga, éxito y error.
 
 ---
 
 ## Objetivo final
 
-Todas las reglas de negocio descritas en este documento deberán respetarse en cualquier implementación del proyecto para garantizar la consistencia, la fiabilidad de los datos y la correcta operación de los sistemas internos de Brasaland.
+Todas las reglas de negocio descritas en este documento deberán respetarse en cualquier implementación del Talent Pipeline Tracker para garantizar un proceso de selección consistente, una correcta gestión de las candidaturas y una experiencia fiable para el equipo de People & Talent de Brasaland.

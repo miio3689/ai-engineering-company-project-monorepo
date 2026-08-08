@@ -1,478 +1,113 @@
-# CONTEXTO — Brasaland
+# Bienvenido a Brasaland
 
-**Hito 2: Fundamentos de Programación**  
-**Empresa:** Brasaland — Cadena de Restaurantes de Comida a la Parrilla  
-**Tu Rol:** Desarrollador Junior, Equipo Brasaland Digital  
-**Responsable del Proyecto:** Felipe Guerrero, Director de Operaciones
+## AI Engineering · 4Geeks Academy — Briefing de empresa
 
 ---
 
-## Acerca de Brasaland
+Brasaland es una cadena de restaurantes de cocina a la brasa fundada en 2008 en Medellín, Colombia. Lo que empezó como un único local familiar se convirtió, en quince años, en una cadena de 14 restaurantes propios que opera en dos países: Colombia y Estados Unidos (Florida). La empresa emplea a unas 115 personas y factura alrededor de 6 millones de dólares anuales.
 
-Brasaland es una cadena de restaurantes de comida a la parrilla con 14 locaciones propias en Colombia y Estados Unidos (Florida). La empresa se enfoca en calidad de producto consistente, experiencia cálida al cliente, y velocidad de servicio. Eres parte de Brasaland Digital, el equipo interno que lidera la transformación digital de la empresa.
+La marca siempre ha representado tres cosas: una comida que sabe igual independientemente de si la pides en Medellín o en Miami, una experiencia de servicio cálida y consistente, y una cocina que se mueve rápido. Esos tres compromisos son los que construyeron el negocio — y son también los que hacen que gestionarlo sea cada vez más difícil sin las herramientas adecuadas.
 
----
+## Cómo está organizada la empresa
 
-## Tu Asignación
+Brasaland opera desde su sede en Medellín. Hay una oficina comercial y de operaciones en Miami que coordina los locales de Florida. La empresa está liderada por **Mariana Restrepo**, hija del fundador y CEO desde 2019. Fue ella quien llevó el negocio al mercado estadounidense y ahora está centrada en construir los sistemas internos que permitan seguir creciendo sin perder lo que hace buena a la marca.
 
-Felipe Guerrero, el Director de Operaciones, necesita que construyas la lógica central de procesamiento de datos para el sistema de operaciones de restaurantes de Brasaland. Actualmente, los gerentes de locación manejan todo manualmente — rastreando ventas, calculando márgenes, gestionando desperdicios, y ordenando ingredientes. Este hito se enfoca en construir las funciones TypeScript que alimentarán la analítica de ventas, control de desperdicios, y scoring de performance de locaciones.
+La empresa se organiza en las siguientes áreas:
 
-Esto es programación pura — sin IA, sin prompting. Felipe necesita código que funcione de manera confiable en 14 locaciones en dos países con diferentes monedas y regulaciones.
+**Operaciones de Restaurante** es el corazón del negocio. Felipe Guerrero lidera un equipo de supervisores que supervisan los 14 locales en los dos países. Cada día, cada local gestiona su propia cocina, a su propio equipo y sus propios pedidos de materia prima, en gran medida sin visibilidad desde la sede.
 
----
+**Compras y Proveedores** gestiona las relaciones con los aproximadamente 20 proveedores que suministran todo, desde carne y vegetales hasta embalajes y productos de limpieza. Lucía Fernández lleva esta función, negociando de forma independiente en cada mercado sin datos consolidados de lo que realmente está gastando la cadena.
 
-## Lo que Estás Construyendo
+**Marketing y Experiencia Digital** es responsable de cómo Brasaland se presenta a sus clientes: la web, las redes sociales, el programa de fidelización y las campañas. Camila Ospina lidera el equipo. La marca existe en dos mercados culturalmente muy distintos y, por ahora, no hay prácticamente ningún dato sobre quiénes son los clientes de Brasaland.
 
-Implementarás un conjunto de utilidades TypeScript para:
+**Personas y Cultura** gestiona todo lo relacionado con las 115 personas que trabajan en los 14 locales: contratos, horarios, onboarding y RRHH del día a día. Ashley Turner lidera esta función desde Miami y trabaja a diario con la complejidad de dos mercados laborales muy distintos.
 
-1. **Modelar ítems de menú, ventas y locaciones** usando interfaces
-2. **Filtrar y buscar datos de ventas** por locación, fecha y producto
-3. **Calcular puntajes de performance de locaciones** basados en múltiples métricas
-4. **Computar métricas financieras** (ingreso, costo, margen) en múltiples monedas
-5. **Generar reportes de operaciones** con datos agregados
-6. **Validar datos** antes de procesarlos
+**Formación y Estándares de Calidad** es el área donde Jake Morrison trabaja para garantizar que una hamburguesa de Brasaland se prepare y se presente de la misma manera en todas las cocinas. Los materiales de formación existen, pero son difíciles de consultar y aún más difíciles de mantener actualizados en dos países.
 
----
+**Tecnología** está liderada por el CTO Nicolás Park, con sede en Medellín y un equipo pequeño. El stack tecnológico actual es mínimo: una web estática, una app obsoleta, sistemas de punto de venta distintos en cada país, y una colección de hojas de cálculo que llevan años haciendo el trabajo de sistemas de gestión reales.
 
-## Entidades de Negocio
+**Dirección Ejecutiva** recae en Mariana, quien actualmente toma la mayoría de las decisiones estratégicas basándose en llamadas telefónicas, informes semanales en PDF que llegan los martes por la mañana y su propia experiencia del negocio.
 
-### Ítem de Menú (MenuItem)
+## Dónde está la empresa hoy
 
-Representa un ítem en el menú de Brasaland.
+Brasaland es rentable y tiene una base de clientes fiel en los dos mercados. Pero está gestionando una operación en dos países con herramientas diseñadas para un único restaurante local. Las consecuencias son visibles: pedidos de materia prima hechos por WhatsApp sin datos de inventario detrás, un programa de fidelización que funciona con tarjetas físicas de sello que los clientes pierden constantemente, ninguna visibilidad en tiempo real de lo que ocurre en cada local, y un equipo directivo que no puede responder preguntas básicas del negocio sin hacer llamadas.
 
-**Interfaz: `MenuItem`**
+Mientras tanto, los competidores — incluidas cadenas más nuevas y más pequeñas — están ganando terreno con pedidos digitales, marketing basado en datos y dashboards operativos que permiten a sus managers actuar sobre información real en lugar de intuición.
 
-```typescript
-interface MenuItem {
-  id: string; // ID del ítem (ej: "ITEM-PICANHA-250")
-  name: string; // Nombre del ítem (ej: "Picanha 250g")
-  category: MenuCategory; // Categoría de comida
-  basePrice: Price; // Precio base (puede variar por locación)
-  ingredientCost: Price; // Costo de ingredientes por unidad
-  prepTimeMinutes: number; // Tiempo promedio de preparación
-  isAvailableInColombia: boolean;
-  isAvailableInUSA: boolean;
-  allergens: string[]; // Lista de alérgenos
-  status: MenuItemStatus;
-}
+Mariana ha creado un equipo interno llamado **Brasaland Digital** para cambiar esto. El mandato es construir las herramientas, los sistemas y las automatizaciones que permitan a Brasaland operar como una empresa moderna sin perder el alma de lo que siempre ha sido.
 
-interface Price {
-  USD: number; // Precio en Dólares Estadounidenses
-  COP: number; // Precio en Pesos Colombianos
-}
-
-type MenuCategory = "Meat" | "Side" | "Beverage" | "Dessert" | "Combo";
-type MenuItemStatus = "Active" | "Seasonal" | "Discontinued";
-```
-
-**Reglas de Validación:**
-
-- Ambos precios `USD` y `COP` deben ser > 0
-- `prepTimeMinutes` debe ser > 0 y <= 60
-- `name` no debe estar vacío
-- El ítem debe estar disponible en al menos un país
+**Tú eres parte de ese equipo.**
 
 ---
 
-### Transacción de Venta (SaleTransaction)
+## Los departamentos y sus problemas
 
-Representa una venta realizada en una locación de Brasaland.
+### 🍖 Operaciones de restaurante
 
-**Interfaz: `SaleTransaction`**
+**Director:** Felipe Guerrero
 
-```typescript
-interface SaleTransaction {
-  id: string; // ID de transacción (ej: "TXN-2024-15482")
-  locationId: string; // Locación donde ocurrió la venta
-  itemId: string; // Ítem de menú vendido
-  quantity: number; // Número de unidades vendidas
-  totalPrice: Price; // Precio total cobrado
-  paymentMethod: PaymentMethod; // Cómo pagó el cliente
-  timestamp: Date; // Cuándo ocurrió la venta
-  waiterName: string; // Miembro del personal que atendió
-}
+Cada uno de los 14 locales opera en gran medida de forma aislada. No hay visibilidad centralizada: Felipe no sabe en tiempo real cuántos cubiertos se sirvieron hoy en el local del centro de Medellín ni si el restaurante de Miami está teniendo una semana floja. Los pedidos de ingredientes se hacen por WhatsApp o teléfono, lo que provoca exceso de stock en algunos locales y roturas en otros. Los informes de turno se rellenan en papel o Excel y se envían a RRHH semanalmente.
 
-type PaymentMethod = "Cash" | "Credit card" | "Debit card" | "Digital wallet";
-```
-
-**Reglas de Validación:**
-
-- `quantity` debe ser > 0
-- Ambos valores de precio deben ser > 0
-- `waiterName` no debe estar vacío
+**Qué necesitan:** Un dashboard de ventas en tiempo real por local (en COP y USD), un sistema inteligente de pedidos de ingredientes basado en ventas históricas y stock actual, y alertas automáticas cuando un local no registra ventas durante el horario de apertura.
 
 ---
 
-### Locación (Location)
+### 🛒 Compras y proveedores
 
-Representa una locación de restaurante Brasaland.
+**Responsable:** Lucía Fernández
 
-**Interfaz: `Location`**
+Brasaland trabaja con alrededor de 20 proveedores entre Colombia y Florida — carne, verduras, salsas, bebidas, packaging, productos de limpieza. La negociación de precios se hace por email y Excel. Lucía se entera de los cambios en el precio de las materias primas cuando llega la factura. No existe ningún dato consolidado de compras a nivel de cadena.
 
-```typescript
-interface Location {
-  id: string; // ID de locación (ej: "LOC-MEDELLIN-01")
-  name: string; // Nombre de la locación
-  city: string; // Nombre de la ciudad
-  country: Country; // Colombia o USA
-  openingYear: number; // Año de apertura
-  seatingCapacity: number; // Número máximo de clientes
-  staffCount: number; // Número de empleados
-  monthlyRentCost: Price; // Renta mensual
-  averageMonthlyUtilities: Price; // Servicios mensuales promedio
-  manager: string; // Nombre del gerente de locación
-  status: LocationStatus;
-}
-
-type Country = "Colombia" | "USA";
-type LocationStatus = "Active" | "Temporarily closed" | "Under renovation";
-```
-
-**Reglas de Validación:**
-
-- `openingYear` debe ser >= 2008 y <= año actual
-- `seatingCapacity` debe ser > 0
-- `staffCount` debe ser > 0
-- Ambos costos de renta y servicios deben ser > 0
+**Qué necesitan:** Una plataforma de gestión de proveedores con historial de precios y alertas, y visibilidad consolidada de compras para facilitar negociaciones centralizadas en ambos mercados.
 
 ---
 
-### Registro de Desperdicio (WasteRecord)
+### 📱 Marketing y experiencia digital
 
-Rastrea desperdicio de comida en una locación.
+**Responsable:** Camila Ospina
 
-**Interfaz: `WasteRecord`**
+La web de Brasaland es de 2019, no acepta pedidos online y tiene una valoración de 2,8 en la app store. El programa de fidelización ("Brasa Points") funciona con tarjetas físicas de sellos — el 60% de los clientes no las usa y las tarjetas no generan ningún dato. No hay ninguna información sobre quiénes son realmente los clientes de Brasaland.
 
-```typescript
-interface WasteRecord {
-  id: string; // ID de registro de desperdicio
-  locationId: string; // Locación donde ocurrió el desperdicio
-  itemId: string; // Ítem de menú desperdiciado
-  quantity: number; // Número de unidades desperdiciadas
-  reason: WasteReason; // Por qué se desperdició
-  cost: Price; // Costo de ítems desperdiciados
-  timestamp: Date; // Cuándo se registró
-  reportedBy: string; // Miembro del personal que lo reportó
-}
-
-type WasteReason =
-  | "Expired"
-  | "Cooking error"
-  | "Customer return"
-  | "Damage"
-  | "Other";
-```
+**Qué necesitan:** Una app digital de fidelización y pedidos, un CRM de clientes con historial de pedidos y preferencias, y un motor de personalización que sugiera productos relevantes en función del comportamiento.
 
 ---
 
-## Funciones Requeridas
+### 🧑‍🤝‍🧑 Personas y cultura
 
-Implementa estas funciones en los archivos apropiados según la estructura del README.
+**Responsable:** Ashley Turner (Miami)
 
-### 1. Operaciones de Colecciones (`src/utils/collections.ts`)
+Gestionar 115 personas en 14 locales de dos países con legislaciones laborales muy distintas genera una carga administrativa enorme. La mayoría de los procesos de RRHH se gestionan por email y Excel. La incorporación de nuevo personal de cocina — con alta rotación — es completamente manual.
 
-**`filterSalesByLocation(sales: SaleTransaction[], locationId: string): SaleTransaction[]`**
-
-- Retorna todas las ventas de la locación especificada
-
-**`filterSalesByDateRange(sales: SaleTransaction[], startDate: Date, endDate: Date): SaleTransaction[]`**
-
-- Retorna ventas que ocurrieron entre las fechas de inicio y fin (inclusive)
-
-**`filterMenuItemsByCategory(items: MenuItem[], category: MenuCategory): MenuItem[]`**
-
-- Retorna ítems de menú en la categoría especificada
-
-**`filterActiveLocations(locations: Location[]): Location[]`**
-
-- Retorna locaciones con estado "Active"
-
-**`sortLocationsByCapacity(locations: Location[], order: "asc" | "desc"): Location[]`**
-
-- Retorna locaciones ordenadas por capacidad de asientos
-- No debe mutar el array original
-
-**`sortMenuItemsByPrice(items: MenuItem[], currency: "USD" | "COP", order: "asc" | "desc"): MenuItem[]`**
-
-- Retorna ítems de menú ordenados por precio en la moneda especificada
-- No debe mutar el array original
+**Qué necesitan:** Un portal interno de RRHH para solicitudes de vacaciones y gestión de ausencias, un flujo automatizado de onboarding, y un dashboard de KPIs de RRHH con rotación, absentismo y tiempos de cobertura de vacantes — segmentado por país.
 
 ---
 
-### 2. Operaciones de Búsqueda (`src/utils/search.ts`)
+### 🎓 Formación y estándares de calidad
 
-**`findLocationById(locations: Location[], id: string): Location | null`**
+**Responsable:** Jake Morrison (Miami)
 
-- Realiza búsqueda lineal para encontrar una locación por ID
-- Retorna la locación si se encuentra, null en caso contrario
+Todos los locales deben seguir las mismas recetas, técnicas de preparación y estándares de presentación independientemente del país. Los materiales de formación están en un Google Drive compartido que nadie sabe navegar. Cuando cambia una receta o un procedimiento, comunicar la actualización a los 14 locales en dos idiomas lleva días y suele generar confusión.
 
-**`findMenuItemByName(items: MenuItem[], name: string): MenuItem | null`**
-
-- Realiza búsqueda lineal para encontrar un ítem de menú por nombre
-- La comparación de nombre debe ser case-insensitive
-- Retorna el ítem si se encuentra, null en caso contrario
-
-**`binarySearchLocationByCapacity(sortedLocations: Location[], targetCapacity: number): number`**
-
-- Asume que el array ya está ordenado por capacidad de asientos (ascendente)
-- Realiza búsqueda binaria para encontrar el índice de una locación con la capacidad objetivo
-- Retorna el índice si se encuentra, -1 en caso contrario
+**Qué necesitan:** Una plataforma de formación con un catálogo de recetas con búsqueda, un itinerario de incorporación estructurado para el nuevo personal, y un sistema que distribuya actualizaciones de recetas a todos los locales simultáneamente. El soporte multiidioma (español e inglés) es opcional pero altamente recomendado, empezando por un idioma base.
 
 ---
 
-### 3. Cálculos Financieros (`src/utils/transformations.ts`)
+### 💻 Tecnología
 
-**`calculateDailyRevenue(sales: SaleTransaction[], date: Date, currency: "USD" | "COP"): number`**
+**CTO:** Nicolás Park (Medellín)
 
-- Calcula el ingreso total para una fecha específica en la moneda especificada
-- Retorna total redondeado a 2 decimales
+El stack tecnológico actual de Brasaland es mínimo: una web estática, una app desactualizada, un terminal de punto de venta diferente en cada país sin integración, y hojas de cálculo que actúan como sistemas de gestión. No hay API interna, ni datos consolidados, ni telemetría. Nicolás tiene el mandato de construir la plataforma digital de Brasaland desde casi cero.
 
-**`calculateLocationMargin(sales: SaleTransaction[], menuItems: MenuItem[], locationId: string, currency: "USD" | "COP"): number`**
-
-- Calcula margen de ganancia para una locación
-- Fórmula: ((Ingreso Total - Costo Total de Ingredientes) / Ingreso Total) \* 100
-- Usa ventas de esa locación solamente
-- Une ventas con ítems de menú para obtener costos de ingredientes
-- Retorna margen como porcentaje (0-100), redondeado a 2 decimales
-
-**`calculateWasteCost(wasteRecords: WasteRecord[], locationId: string, currency: "USD" | "COP"): number`**
-
-- Calcula costo total de desperdicio para una locación en la moneda especificada
-- Retorna total redondeado a 2 decimales
-
-**`convertCurrency(amount: number, fromCurrency: "USD" | "COP", toCurrency: "USD" | "COP"): number`**
-
-- Convierte entre USD y COP usando una tasa de cambio fija
-- Usar tasa: 1 USD = 4000 COP
-- Retorna cantidad convertida redondeada a 2 decimales
-- Si origen y destino son iguales, retornar la cantidad original
+**Qué necesitan:** Una API central de Brasaland que cubra locales, menús, ventas, clientes y proveedores; telemetría en tiempo real desde cada local; y un pipeline de datos que alimente los dashboards de operaciones, marketing y finanzas.
 
 ---
 
-### 4. Scoring de Performance de Locación (`src/utils/transformations.ts`)
+### 📊 Dirección ejecutiva
 
-**`scoreLocationPerformance(location: Location, sales: SaleTransaction[], wasteRecords: WasteRecord[], menuItems: MenuItem[]): number`**
+**CEO:** Mariana Restrepo
 
-Calcula un puntaje de performance (0-100) para una locación basado en:
+Mariana gestiona una cadena de 14 locales en dos mercados sin un dashboard unificado. Sus decisiones se basan en llamadas con el equipo de operaciones, informes en PDF que llegan los martes y la intuición. No puede responder en tiempo real: "¿cuánto vendimos esta semana en Florida?" o "¿qué local tiene el ticket medio más alto este mes?"
 
-- **Performance de ingresos (40 puntos máx):**
-  - Calcular promedio diario de ingresos (ingresos totales / número de días operativos)
-  - Días operativos = días desde apertura (estimar desde openingYear)
-  - Puntaje: (ingreso diario promedio en USD / 1000) \* 40, con tope en 40
-
-- **Eficiencia (30 puntos máx):**
-  - Calcular eficiencia de asientos: (conteo total de ventas / seatingCapacity) \* 30, con tope en 30
-  - Representa qué tan bien la locación usa su capacidad
-
-- **Control de desperdicio (20 puntos máx):**
-  - Calcular porcentaje de desperdicio: (costo total de desperdicio / ingreso total) \* 100
-  - Puntaje: 20 - (porcentaje de desperdicio \* 2), mínimo 0
-  - Menor desperdicio = mayor puntaje
-
-- **Margen de ganancia (10 puntos máx):**
-  - Usar función calculateLocationMargin
-  - Puntaje: margen / 10, con tope en 10
-
-Retorna puntaje total redondeado a 2 decimales
-
-**`rankLocationsByPerformance(locations: Location[], sales: SaleTransaction[], wasteRecords: WasteRecord[], menuItems: MenuItem[]): Array<{location: Location, score: number}>`**
-
-- Puntúa todas las locaciones
-- Las retorna ordenadas por puntaje (más alto primero)
-- Cada elemento contiene la locación y su puntaje
+**Qué necesita:** Un dashboard ejecutivo con las ventas totales de la cadena en USD y COP, un asistente de IA al que pueda consultar en lenguaje natural, y un informe semanal automatizado generado y enviado cada lunes a las 7 de la mañana.
 
 ---
-
-### 5. Agregaciones y Reportes (`src/utils/transformations.ts`)
-
-**`countSalesByPaymentMethod(sales: SaleTransaction[]): Record<PaymentMethod, number>`**
-
-- Retorna conteo de ventas para cada método de pago
-
-**`calculateAverageTicket(sales: SaleTransaction[], currency: "USD" | "COP"): number`**
-
-- Retorna valor promedio de venta en la moneda especificada
-- Redondear a 2 decimales
-
-**`findTopSellingItems(sales: SaleTransaction[], menuItems: MenuItem[], topN: number): Array<{item: MenuItem, totalSold: number}>`**
-
-- Encuentra los N ítems de menú más vendidos
-- Une ventas con ítems de menú
-- Los retorna ordenados por cantidad vendida (más alto primero)
-- Cada elemento contiene el ítem de menú y cantidad total vendida
-
-**`groupWasteByReason(wasteRecords: WasteRecord[]): Record<WasteReason, WasteRecord[]>`**
-
-- Agrupa registros de desperdicio por razón
-- Retorna un objeto donde las claves son razones de desperdicio y los valores son arrays de registros
-
-**`calculateCountryComparison(sales: SaleTransaction[], locations: Location[], menuItems: MenuItem[]): {Colombia: CountryMetrics, USA: CountryMetrics}`**
-
-Retorna métricas comparativas para cada país:
-
-```typescript
-interface CountryMetrics {
-  totalLocations: number;
-  totalRevenue: Price;
-  averageRevenuePerLocation: Price;
-  totalSales: number;
-}
-```
-
----
-
-### 6. Validaciones (`src/utils/validations.ts`)
-
-**`validateMenuItem(item: MenuItem): { valid: boolean, errors: string[] }`**
-
-- Valida todas las reglas de negocio para un ítem de menú
-- Retorna un objeto con:
-  - `valid`: true si todas las validaciones pasan, false en caso contrario
-  - `errors`: array de mensajes de error (vacío si es válido)
-
-**`validateSaleTransaction(sale: SaleTransaction): { valid: boolean, errors: string[] }`**
-
-- Valida todas las reglas de negocio para una venta
-- Retorna un objeto con:
-  - `valid`: true si todas las validaciones pasan, false en caso contrario
-  - `errors`: array de mensajes de error (vacío si es válido)
-
-**`validateLocation(location: Location): { valid: boolean, errors: string[] }`**
-
-- Valida todas las reglas de negocio para una locación
-- Retorna un objeto con:
-  - `valid`: true si todas las validaciones pasan, false en caso contrario
-  - `errors`: array de mensajes de error (vacío si es válido)
-
----
-
-## Datos de Ejemplo
-
-Usa estos datos para probar tus funciones:
-
-### Ítems de Menú de Ejemplo
-
-```typescript
-const sampleMenuItems: MenuItem[] = [
-  {
-    id: "ITEM-PICANHA-250",
-    name: "Picanha 250g",
-    category: "Meat",
-    basePrice: { USD: 18.5, COP: 74000 },
-    ingredientCost: { USD: 7.2, COP: 28800 },
-    prepTimeMinutes: 15,
-    isAvailableInColombia: true,
-    isAvailableInUSA: true,
-    allergens: [],
-    status: "Active",
-  },
-  {
-    id: "ITEM-FRIES",
-    name: "Papas Fritas",
-    category: "Side",
-    basePrice: { USD: 4.5, COP: 18000 },
-    ingredientCost: { USD: 1.2, COP: 4800 },
-    prepTimeMinutes: 8,
-    isAvailableInColombia: true,
-    isAvailableInUSA: true,
-    allergens: [],
-    status: "Active",
-  },
-  {
-    id: "ITEM-COKE",
-    name: "Coca-Cola",
-    category: "Beverage",
-    basePrice: { USD: 2.5, COP: 10000 },
-    ingredientCost: { USD: 0.8, COP: 3200 },
-    prepTimeMinutes: 2,
-    isAvailableInColombia: true,
-    isAvailableInUSA: true,
-    allergens: [],
-    status: "Active",
-  },
-];
-```
-
-### Locaciones de Ejemplo
-
-```typescript
-const sampleLocations: Location[] = [
-  {
-    id: "LOC-MEDELLIN-01",
-    name: "Brasaland Medellín Centro",
-    city: "Medellín",
-    country: "Colombia",
-    openingYear: 2008,
-    seatingCapacity: 80,
-    staffCount: 12,
-    monthlyRentCost: { USD: 1500, COP: 6000000 },
-    averageMonthlyUtilities: { USD: 400, COP: 1600000 },
-    manager: "Carlos Jiménez",
-    status: "Active",
-  },
-  {
-    id: "LOC-MIAMI-01",
-    name: "Brasaland Miami Beach",
-    city: "Miami",
-    country: "USA",
-    openingYear: 2018,
-    seatingCapacity: 100,
-    staffCount: 15,
-    monthlyRentCost: { USD: 5500, COP: 22000000 },
-    averageMonthlyUtilities: { USD: 800, COP: 3200000 },
-    manager: "Jake Morrison",
-    status: "Active",
-  },
-];
-```
-
-### Ventas de Ejemplo
-
-```typescript
-const sampleSales: SaleTransaction[] = [
-  {
-    id: "TXN-2024-15482",
-    locationId: "LOC-MEDELLIN-01",
-    itemId: "ITEM-PICANHA-250",
-    quantity: 2,
-    totalPrice: { USD: 37.0, COP: 148000 },
-    paymentMethod: "Credit card",
-    timestamp: new Date("2024-03-15T19:30:00"),
-    waiterName: "María González",
-  },
-  {
-    id: "TXN-2024-15483",
-    locationId: "LOC-MIAMI-01",
-    itemId: "ITEM-FRIES",
-    quantity: 3,
-    totalPrice: { USD: 13.5, COP: 54000 },
-    paymentMethod: "Cash",
-    timestamp: new Date("2024-03-15T20:15:00"),
-    waiterName: "John Smith",
-  },
-];
-```
-
----
-
-## Criterios de Aceptación
-
-Tu implementación será evaluada en:
-
-1. **Type Safety:** Todas las interfaces definidas correctamente con tipos apropiados
-2. **Corrección de Funciones:** Cada función produce el output esperado para los inputs dados
-3. **Manejo de Casos Límite:** Las funciones manejan arrays vacíos, valores nulos y datos inválidos correctamente
-4. **Lógica de Validación:** Las reglas de negocio se aplican con precisión
-5. **Organización del Código:** Las funciones están en los archivos correctos según responsabilidad
-6. **Convenciones de Nombres:** Variables, funciones y tipos siguen las convenciones de TypeScript
-7. **Sin Mutaciones:** Las funciones de ordenamiento y filtrado no modifican los arrays originales
-8. **Funciones Puras:** Las funciones solo trabajan con parámetros, sin variables globales
-9. **Manejo de Monedas:** Todos los cálculos financieros funcionan correctamente tanto en USD como en COP
-
----
-
-## Lo que Felipe Espera
-
-> "Mira, tenemos 14 locaciones funcionando todos los días. Tu código necesita manejar pesos colombianos y dólares estadounidenses correctamente, trabajar con diferentes zonas horarias, y darme números precisos en los que pueda confiar. Sin atajos. Si el cálculo de margen está mal, estoy tomando malas decisiones. Constrúyelo bien."  
-> — Felipe Guerrero, Director de Operaciones
-

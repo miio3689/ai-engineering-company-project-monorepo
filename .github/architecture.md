@@ -4,29 +4,65 @@
 
 Este documento describe la estructura del proyecto y la responsabilidad de cada directorio y archivo.
 
-La arquitectura está organizada siguiendo el principio de **una única responsabilidad por archivo**, facilitando el mantenimiento, la reutilización del código y su escalabilidad.
+La arquitectura está organizada siguiendo el principio de **una única responsabilidad por carpeta y componente**, facilitando el mantenimiento, la reutilización del código y su escalabilidad.
 
 ---
 
 ## Estructura del proyecto
 
 ```text
-src/
+app/
+├── page.tsx
+├── candidates/
+│   └── [id]/
+│       └── page.tsx
+│
+├── components/
+│
 ├── types/
 │   └── models.ts
 │
-├── utils/
-│   ├── collections.ts
-│   ├── search.ts
-│   ├── transformations.ts
-│   └── validations.ts
+├── services/
+│   └── api.ts
 │
-└── index.html (opcional)
+├── hooks/ (opcional)
+│
+├── lib/ (opcional)
+│
+└── public/
 ```
 
 ---
 
 ## Directorios
+
+### `app/`
+
+Contiene todas las páginas de la aplicación utilizando **Next.js App Router**.
+
+Cada ruta representa una vista de la aplicación.
+
+No debe contener:
+
+* Lógica compleja de negocio.
+* Acceso directo a la API.
+* Definición de modelos.
+
+---
+
+### `components/`
+
+Contiene todos los componentes reutilizables de la interfaz.
+
+Debe incluir únicamente componentes de presentación o componentes reutilizables entre distintas páginas.
+
+No debe contener:
+
+* Lógica de acceso a datos.
+* Modelos TypeScript.
+* Configuración de la aplicación.
+
+---
 
 ### `types/`
 
@@ -35,9 +71,8 @@ Contiene todas las interfaces, tipos y enumeraciones utilizadas por la aplicaci�
 No debe contener:
 
 * Lógica de negocio.
-* Validaciones.
-* Cálculos.
-* Funciones de utilidad.
+* Peticiones HTTP.
+* Componentes React.
 
 #### Archivo
 
@@ -51,171 +86,157 @@ Responsable de definir:
 
 ---
 
-### `utils/`
+### `services/`
 
-Contiene toda la lógica de negocio del proyecto.
+Contiene toda la comunicación con la API.
 
-Cada archivo debe tener una responsabilidad específica.
+Debe centralizar:
+
+* Peticiones GET.
+* Peticiones POST.
+* Peticiones PUT.
+* Peticiones PATCH.
+* Peticiones DELETE.
+
+No debe contener:
+
+* Componentes React.
+* Lógica de presentación.
 
 ---
 
-## Archivos
+### `hooks/` (opcional)
 
-### `collections.ts`
+Contiene hooks personalizados reutilizables.
+
+Puede utilizarse para encapsular:
+
+* Obtención de datos.
+* Gestión de estados.
+* Lógica compartida entre componentes.
+
+No debe contener:
+
+* Componentes visuales.
+* Definición de modelos.
+
+---
+
+### `lib/` (opcional)
+
+Contiene utilidades reutilizables que no pertenecen directamente a ningún componente o servicio.
+
+Puede incluir:
+
+* Funciones auxiliares.
+* Formateadores.
+* Conversores.
+* Constantes compartidas.
+
+---
+
+## Rutas principales
+
+### `/`
 
 Responsabilidad:
 
-Gestionar operaciones sobre colecciones de datos.
+Mostrar el listado completo de candidaturas.
 
-#### Debe contener
+Debe permitir:
 
-* Funciones de filtrado.
-* Funciones de ordenación.
-* Operaciones sobre arrays.
-
-#### No debe contener
-
-* Cálculos financieros.
-* Validaciones.
-* Búsquedas binarias o lineales.
-* Interfaces.
+* Buscar candidatos.
+* Filtrar por estado.
+* Filtrar por etapa.
+* Navegar al detalle de cada candidatura.
 
 ---
 
-### `search.ts`
+### `/candidates/[id]`
 
 Responsabilidad:
 
-Implementar algoritmos de búsqueda.
+Mostrar toda la información de un candidato.
 
-#### Debe contener
+Debe permitir:
 
-* Búsqueda lineal.
-* Búsqueda binaria.
-
-#### No debe contener
-
-* Ordenaciones.
-* Validaciones.
-* Transformaciones.
-* Interfaces.
-
----
-
-### `transformations.ts`
-
-Responsabilidad:
-
-Realizar transformaciones, cálculos y generación de métricas.
-
-#### Debe contener
-
-* Cálculos financieros.
-* Conversión de monedas.
-* Agregaciones.
-* Reportes.
-* Rankings.
-* Métricas de rendimiento.
-
-#### No debe contener
-
-* Interfaces.
-* Validaciones.
-* Operaciones de búsqueda.
-
----
-
-### `validations.ts`
-
-Responsabilidad:
-
-Validar las reglas de negocio de las entidades.
-
-#### Debe contener
-
-* Validaciones de `MenuItem`.
-* Validaciones de `SaleTransaction`.
-* Validaciones de `Location`.
-
-#### No debe contener
-
-* Cálculos.
-* Agregaciones.
-* Ordenaciones.
-* Interfaces.
-
----
-
-### `index.html` (opcional)
-
-Página sencilla para realizar pruebas manuales durante el desarrollo.
-
-Puede utilizarse para:
-
-* Ejecutar funciones.
-* Mostrar resultados.
-* Verificar el comportamiento de la lógica implementada.
-
-No forma parte de la lógica principal del proyecto.
+* Consultar los datos completos.
+* Actualizar estado.
+* Actualizar etapa.
+* Gestionar notas.
+* Editar la candidatura.
 
 ---
 
 ## Flujo de dependencias
 
-La arquitectura debe respetar el siguiente flujo:
+La arquitectura deberá respetar el siguiente flujo:
 
 ```text
 models.ts
       │
       ▼
-collections.ts
-search.ts
-transformations.ts
-validations.ts
+services/
       │
       ▼
-Aplicación / pruebas
+hooks/ (opcional)
+      │
+      ▼
+components/
+      │
+      ▼
+app/
 ```
 
-Los archivos de utilidades utilizan los modelos definidos en `models.ts`, pero nunca deben depender entre sí de forma innecesaria.
+Los modelos son la base de toda la aplicación.
+
+Los servicios consumen la API.
+
+Los hooks reutilizan la lógica cuando sea necesario.
+
+Los componentes construyen la interfaz.
+
+Las páginas ensamblan todos los elementos anteriores.
 
 ---
 
 ## Principios de arquitectura
 
-La implementación debe seguir los siguientes principios:
+La implementación deberá seguir los siguientes principios:
 
-* Una única responsabilidad por archivo.
+* Una única responsabilidad por carpeta y archivo.
 * Bajo acoplamiento entre módulos.
-* Alta cohesión dentro de cada archivo.
-* Código reutilizable.
-* Funciones independientes.
-* Tipado estricto.
-* Separación clara entre modelos y lógica de negocio.
+* Alta cohesión.
+* Componentes reutilizables.
+* Separación entre interfaz, lógica y acceso a datos.
+* Tipado estricto con TypeScript.
+* Comunicación con la API centralizada.
+* Arquitectura escalable y mantenible.
 
 ---
 
 ## Organización futura
 
-Si el proyecto crece, la estructura deberá mantenerse organizada por responsabilidades.
+Si el proyecto crece, la estructura podrá ampliarse manteniendo la separación de responsabilidades.
 
 Ejemplo:
 
 ```text
-src/
-├── types/
-├── utils/
-├── services/
-├── helpers/
-├── constants/
-├── data/
-└── tests/
+app/
+components/
+types/
+services/
+hooks/
+lib/
+constants/
+styles/
+tests/
 ```
 
-La incorporación de nuevos directorios no debe romper la separación de responsabilidades existente.
+La incorporación de nuevos directorios no deberá romper la arquitectura existente.
 
 ---
 
 ## Objetivo final
 
-La arquitectura debe facilitar que cualquier desarrollador pueda localizar rápidamente la lógica correspondiente a cada funcionalidad, mantener el código de forma sencilla y ampliar el proyecto sin generar dependencias innecesarias entre módulos.
+La arquitectura debe facilitar que cualquier desarrollador pueda localizar rápidamente cada funcionalidad, mantener el código de forma sencilla y ampliar la aplicación sin generar dependencias innecesarias entre módulos.

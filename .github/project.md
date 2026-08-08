@@ -2,147 +2,99 @@
 
 ## Objetivo
 
-Este documento describe el alcance y los objetivos del proyecto correspondiente al **Hito 2: Fundamentos de Programación**.
+Desarrollar el frontend del sistema **Talent Pipeline Tracker**, una herramienta interna utilizada por el departamento de **People & Talent** de Brasaland para gestionar el proceso de selección de candidatos.
 
-El propósito de este hito es desarrollar la capa de lógica de negocio que servirá como base para los futuros sistemas internos de Brasaland. La implementación debe ser completamente reutilizable, estar desarrollada en TypeScript y seguir buenas prácticas de programación.
-
----
-
-## Descripción del proyecto
-
-Brasaland Digital necesita desarrollar una colección de utilidades que permitan procesar la información operativa de la empresa de forma eficiente.
-
-Estas utilidades serán utilizadas posteriormente por aplicaciones internas, dashboards y herramientas de análisis, por lo que deben ser fiables, reutilizables y fáciles de mantener.
-
-En este hito el foco está exclusivamente en la lógica de programación y el tratamiento de datos.
+La aplicación permitirá visualizar, buscar, filtrar y administrar candidaturas de forma eficiente utilizando una API REST ya existente.
 
 ---
 
-## Alcance
+## Contexto
 
-El proyecto debe incluir el desarrollo de:
+Brasaland es una cadena de restaurantes con presencia en Colombia y Estados Unidos que se encuentra en pleno proceso de transformación digital mediante el equipo **Brasaland Digital**.
 
-* Modelado de datos mediante interfaces TypeScript.
-* Operaciones sobre colecciones de datos.
-* Algoritmos de búsqueda.
-* Transformaciones y agregaciones de datos.
-* Cálculos financieros.
-* Cálculo de métricas de rendimiento.
-* Validaciones de reglas de negocio.
+El departamento de People & Talent gestiona actualmente las candidaturas mediante hojas de cálculo compartidas y documentos independientes, lo que provoca pérdidas de información, errores de sincronización y una gestión poco eficiente.
+
+Este proyecto sustituirá ese proceso manual por una aplicación web moderna que centralice toda la información de los candidatos.
 
 ---
 
-## Fuera del alcance
+## Usuarios
 
-Este proyecto **no debe incluir**:
+La aplicación está destinada al equipo interno de **People & Talent** de Brasaland.
 
-* Inteligencia Artificial.
-* Backend.
-* Bases de datos.
-* APIs externas.
-* Autenticación o autorización.
-* Persistencia de información.
-* Frameworks frontend para implementar la lógica.
-* Funcionalidades que no formen parte del briefing.
+Los usuarios utilizarán la herramienta para:
+
+* Consultar todas las candidaturas.
+* Buscar candidatos rápidamente.
+* Filtrar candidaturas por estado y etapa.
+* Consultar el detalle de cada candidato.
+* Actualizar el estado del proceso de selección.
+* Añadir y eliminar notas internas.
+* Registrar nuevas candidaturas.
+* Editar información existente.
+
+---
+
+## Objetivos funcionales
+
+La aplicación deberá permitir:
+
+* Visualizar todas las candidaturas en un listado.
+* Buscar candidatos por nombre o correo electrónico.
+* Filtrar por estado y etapa del proceso.
+* Consultar el detalle completo de un candidato.
+* Actualizar el estado y la etapa de una candidatura.
+* Crear nuevas candidaturas.
+* Editar candidaturas existentes.
+* Gestionar notas internas asociadas a cada candidato.
+* Comunicar claramente los estados de carga y los posibles errores durante las operaciones.
 
 ---
 
 ## Tecnologías
 
-Las tecnologías utilizadas en este proyecto serán:
+El proyecto se desarrollará utilizando:
 
+* Next.js (App Router)
+* React
 * TypeScript
-* JavaScript (ES6+)
-* HTML (opcional para pruebas)
-* Tailwind CSS (opcional para pruebas visuales)
+* Tailwind CSS
+* ESLint
 
-No deben utilizarse librerías externas para implementar la lógica solicitada, salvo que el proyecto lo indique expresamente.
-
----
-
-## Funcionalidades
-
-El proyecto debe proporcionar utilidades para trabajar con la información de Brasaland.
-
-### Gestión de colecciones
-
-* Filtrar elementos.
-* Ordenar colecciones.
-* Buscar registros.
-* Agrupar información.
-
-### Transformación de datos
-
-* Calcular ingresos.
-* Calcular márgenes.
-* Convertir monedas.
-* Calcular costes.
-* Obtener medias.
-* Generar rankings.
-* Crear reportes agregados.
-
-### Validaciones
-
-* Validar entidades de negocio.
-* Comprobar reglas de negocio.
-* Detectar datos inválidos.
-* Generar mensajes de error descriptivos.
+La comunicación con el backend se realizará mediante una API REST utilizando peticiones HTTP asíncronas.
 
 ---
 
-## Estructura del proyecto
+## Integración
 
-El código debe organizarse por responsabilidades.
+La aplicación consumirá la API proporcionada por el equipo backend.
 
-```text
-src/
-├── types/
-│   └── models.ts
-│
-├── utils/
-│   ├── collections.ts
-│   ├── search.ts
-│   ├── transformations.ts
-│   └── validations.ts
-│
-└── index.html (opcional)
-```
-
-Cada archivo debe contener únicamente las funciones relacionadas con su responsabilidad.
+La URL base de la API se almacenará mediante variables de entorno para facilitar la configuración entre distintos entornos.
 
 ---
 
-## Objetivos de calidad
+## Calidad del proyecto
 
-Toda la implementación debe cumplir los siguientes principios:
+La implementación deberá priorizar:
 
-* Utilizar TypeScript con tipado estricto.
-* Escribir funciones puras siempre que sea posible.
-* Evitar efectos secundarios.
-* No modificar los parámetros recibidos, salvo que se indique expresamente.
-* Utilizar nombres descriptivos para variables, funciones e interfaces.
-* Mantener una única responsabilidad por función.
-* Escribir código reutilizable y fácil de mantener.
-* Priorizar la legibilidad sobre soluciones excesivamente complejas.
+* Código modular y reutilizable.
+* Componentes reutilizables.
+* Tipado estricto con TypeScript.
+* Separación clara entre presentación, lógica y acceso a datos.
+* Experiencia de usuario fluida.
+* Interfaz rápida y reactiva.
+* Manejo adecuado de estados de carga y errores.
 
 ---
 
-## Criterios de aceptación
+## Alcance
 
-El proyecto se considerará completo cuando:
+Este proyecto comprende exclusivamente el desarrollo del frontend.
 
-* Todas las interfaces estén correctamente definidas.
-* Todas las funciones solicitadas estén implementadas.
-* Las validaciones respeten las reglas de negocio.
-* Los cálculos financieros sean correctos tanto en USD como en COP.
-* Las funciones manejen correctamente casos límite.
-* Las operaciones de ordenación no modifiquen los arrays originales.
-* Todo el código compile sin errores de TypeScript.
+No se implementará lógica de backend ni persistencia propia, ya que toda la información será gestionada mediante la API existente.
 
 ---
 
 ## Resultado esperado
 
-Al finalizar este hito, el proyecto dispondrá de una biblioteca de utilidades TypeScript capaz de gestionar, transformar, validar y analizar la información operativa de Brasaland.
-
-Esta capa de lógica será la base sobre la que se construirán los siguientes módulos del sistema interno de la empresa.
+El resultado será una aplicación web interna que permita al equipo de People & Talent gestionar de forma eficiente todo el ciclo de vida de las candidaturas desde una única interfaz, mejorando la organización, reduciendo errores y agilizando el proceso de selección.
