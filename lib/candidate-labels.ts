@@ -8,10 +8,10 @@ const STATUS_LABELS: Record<CandidateStatus, string> = {
 };
 
 const STAGE_LABELS: Record<CandidateStage, string> = {
-  pending: "Pendiente de revision",
-  review: "En revision",
+  pending: "Pendiente de revisión",
+  review: "En revisión",
   personal_interview: "Entrevista personal",
-  technical_interview: "Entrevista tecnica",
+  technical_interview: "Entrevista técnica",
   offer_presented: "Oferta presentada",
 };
 

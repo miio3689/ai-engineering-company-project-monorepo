@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getStageLabel, getStatusLabel } from "@/lib/candidate-labels";
-import { fetchCandidateById } from "@/services/api";
+import CandidateDetailManager from "@/components/candidate-detail-manager";
+import { fetchCandidateById, fetchCandidateNotes } from "@/services/api";
 
 export const dynamic = "force-dynamic";
 
@@ -67,27 +66,13 @@ export default async function CandidateDetailPage({
     notFound();
   }
 
+  const notes = await fetchCandidateNotes(candidateId);
+
   const backHref = buildBackHref(
     resolvedSearchParams.q,
     resolvedSearchParams.status,
     resolvedSearchParams.stage,
   );
 
-  return (
-    <main>
-      <header>
-        <h1>{candidate.name}</h1>
-      </header>
-
-      <section>
-        <p>Puesto: {candidate.position}</p>
-        <p>Estado: {getStatusLabel(candidate.status)}</p>
-        <p>Etapa: {getStageLabel(candidate.stage)}</p>
-      </section>
-
-      <nav>
-        <Link href={backHref}>Volver al listado</Link>
-      </nav>
-    </main>
-  );
+  return <CandidateDetailManager candidate={candidate} notes={notes} backHref={backHref} />;
 }

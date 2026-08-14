@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import CandidateListFilters from "@/components/candidate-list-filters";
+import CreateCandidateForm from "@/components/create-candidate-form";
 import { getStageLabel, getStatusLabel } from "@/lib/candidate-labels";
 import { fetchCandidates } from "@/services/api";
 import type { Candidate, CandidateStage, CandidateStatus } from "@/types/models";
@@ -105,29 +106,39 @@ export default async function CandidatesPage({ searchParams }: CandidatesPagePro
   const currentQuery = buildCurrentQuery(searchQuery, statusFilter, stageFilter);
 
   return (
-    <main>
-      <header>
-        <h1>Listado de candidaturas</h1>
+    <main className="page-shell">
+      <header className="page-header">
+        <h1 className="page-title">Listado de candidaturas</h1>
+        <p className="page-subtitle">Gestiona y filtra candidaturas del pipeline de seleccion.</p>
       </header>
 
       <CandidateListFilters
         searchQuery={searchQuery}
         statusFilter={statusFilter}
         stageFilter={stageFilter}
+        totalCandidates={candidates.length}
+        shownCandidates={filteredCandidates.length}
       />
 
+      <CreateCandidateForm />
+
       {filteredCandidates.length === 0 ? (
-        <p>No hay candidaturas disponibles.</p>
+        <section className="empty-state" aria-live="polite">
+          <h2>Sin resultados</h2>
+          <p>No hay candidaturas que coincidan con los filtros actuales.</p>
+        </section>
       ) : (
-        <ul>
+        <ul className="candidate-grid" aria-live="polite">
           {filteredCandidates.map((candidate) => (
-            <li key={candidate.id}>
-              <h2>
-                <Link href={`/candidates/${candidate.id}${currentQuery}`}>{candidate.name}</Link>
+            <li key={candidate.id} className="candidate-card">
+              <h2 className="candidate-name">
+                <Link className="candidate-link" href={`/candidates/${candidate.id}${currentQuery}`}>
+                  {candidate.name}
+                </Link>
               </h2>
-              <p>Puesto: {candidate.position}</p>
-              <p>Estado: {getStatusLabel(candidate.status)}</p>
-              <p>Etapa: {getStageLabel(candidate.stage)}</p>
+              <p><strong>Puesto:</strong> {candidate.position}</p>
+              <p><strong>Estado:</strong> {getStatusLabel(candidate.status)}</p>
+              <p><strong>Etapa:</strong> {getStageLabel(candidate.stage)}</p>
             </li>
           ))}
         </ul>

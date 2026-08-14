@@ -1,1 +1,358 @@
-/* Tailwind CDN cubre los estilos de este entregable. Este archivo queda reservado por si el proyecto necesita extensiones futuras. */
+:root {
+	color-scheme: light;
+	--bg: #f5f7f9;
+	--surface: #ffffff;
+	--surface-muted: #f1f4f8;
+	--text: #10243e;
+	--text-soft: #4b5b70;
+	--border: #d7e0ea;
+	--brand: #0b7285;
+	--brand-strong: #095867;
+	--focus: #73c5d1;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+	background: radial-gradient(circle at top right, #dbeaf3 0%, var(--bg) 45%, #edf2f7 100%);
+	color: var(--text);
+}
+
+.page-shell {
+	width: min(1100px, 92vw);
+	margin: 2.5rem auto;
+	display: grid;
+	gap: 1.25rem;
+}
+
+.page-header {
+	background: linear-gradient(135deg, #ffffff, #f2f8fb);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	padding: 1.25rem;
+}
+
+.page-title {
+	margin: 0;
+	font-size: clamp(1.5rem, 2vw + 1rem, 2rem);
+}
+
+.page-subtitle {
+	margin: 0.4rem 0 0;
+	color: var(--text-soft);
+}
+
+.filter-panel {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	padding: 1rem;
+	display: grid;
+	gap: 0.9rem;
+}
+
+.form-panel {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	padding: 1rem;
+	display: grid;
+	gap: 0.8rem;
+}
+
+.form-panel h2 {
+	margin: 0;
+	font-size: 1.15rem;
+}
+
+.form-grid {
+	display: grid;
+	gap: 0.8rem;
+}
+
+.form-grid label,
+.notes-form label {
+	display: grid;
+	gap: 0.35rem;
+	font-size: 0.92rem;
+	color: var(--text-soft);
+}
+
+.form-grid input,
+.form-grid select,
+.notes-form textarea,
+.notes-form input,
+.inline-form select {
+	appearance: none;
+	width: 100%;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: var(--surface-muted);
+	color: var(--text);
+	min-height: 2.5rem;
+	padding: 0.55rem 0.7rem;
+	font: inherit;
+}
+
+.notes-form textarea {
+	min-height: 7rem;
+	resize: vertical;
+}
+
+.form-grid input:focus,
+.form-grid select:focus,
+.notes-form textarea:focus,
+.inline-form select:focus,
+.primary-button:focus-visible,
+.danger-button:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+
+.form-actions {
+	display: flex;
+	justify-content: flex-start;
+}
+
+.full-row {
+	grid-column: 1 / -1;
+}
+
+.primary-button,
+.danger-button {
+	border: 1px solid transparent;
+	border-radius: 10px;
+	min-height: 2.3rem;
+	padding: 0.5rem 0.9rem;
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.primary-button {
+	background: var(--brand);
+	color: #ffffff;
+}
+
+.primary-button:hover:not(:disabled) {
+	background: var(--brand-strong);
+}
+
+.primary-button:disabled,
+.danger-button:disabled {
+	cursor: not-allowed;
+	opacity: 0.6;
+}
+
+.danger-button {
+	background: #fff1f1;
+	border-color: #f7c7c7;
+	color: #a12626;
+}
+
+.danger-button:hover:not(:disabled) {
+	background: #ffe2e2;
+}
+
+.field-error,
+.feedback-error,
+.feedback-success {
+	margin: 0;
+	font-size: 0.9rem;
+}
+
+.field-error,
+.feedback-error {
+	color: #a12626;
+}
+
+.feedback-success {
+	color: #11643c;
+}
+
+.inline-form {
+	display: grid;
+	gap: 0.7rem;
+}
+
+.notes-form {
+	display: grid;
+	gap: 0.6rem;
+}
+
+.notes-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 0.7rem;
+}
+
+.note-item {
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 0.75rem;
+	background: #fafcff;
+	display: grid;
+	gap: 0.45rem;
+}
+
+.note-item p,
+.note-item small {
+	margin: 0;
+}
+
+.filter-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.filter-header h2 {
+	margin: 0;
+	font-size: 1.15rem;
+}
+
+.filter-header p {
+	margin: 0;
+	color: var(--text-soft);
+	font-size: 0.95rem;
+}
+
+.filter-grid {
+	display: grid;
+	gap: 0.8rem;
+}
+
+.field-group {
+	display: grid;
+	gap: 0.4rem;
+}
+
+.field-group label {
+	color: var(--text-soft);
+	font-size: 0.9rem;
+}
+
+.field-group input,
+.field-group select {
+	appearance: none;
+	width: 100%;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: var(--surface-muted);
+	color: var(--text);
+	min-height: 2.5rem;
+	padding: 0.55rem 0.7rem;
+	font: inherit;
+}
+
+.field-group input:focus,
+.field-group select:focus,
+.clear-button:focus-visible,
+.candidate-link:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+
+.filter-actions {
+	display: flex;
+	justify-content: flex-end;
+}
+
+.clear-button {
+	border: 1px solid var(--border);
+	background: #ffffff;
+	color: var(--text);
+	border-radius: 10px;
+	min-height: 2.3rem;
+	padding: 0.45rem 0.9rem;
+	cursor: pointer;
+}
+
+.clear-button:not(:disabled):hover {
+	border-color: var(--brand);
+	color: var(--brand);
+}
+
+.clear-button:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.candidate-grid {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 0.8rem;
+}
+
+.candidate-card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 14px;
+	padding: 1rem;
+}
+
+.candidate-name {
+	margin: 0 0 0.45rem;
+	font-size: 1.1rem;
+}
+
+.candidate-link {
+	color: var(--brand-strong);
+	text-decoration-thickness: 2px;
+}
+
+.candidate-link:hover {
+	color: var(--brand);
+}
+
+.candidate-card p {
+	margin: 0.25rem 0;
+}
+
+.empty-state {
+	background: var(--surface);
+	border: 1px dashed var(--border);
+	border-radius: 14px;
+	padding: 1.25rem;
+}
+
+.empty-state h2 {
+	margin: 0;
+}
+
+.empty-state p {
+	margin: 0.35rem 0 0;
+	color: var(--text-soft);
+}
+
+@media (min-width: 840px) {
+	.filter-grid {
+		grid-template-columns: 2fr 1fr 1fr;
+		align-items: end;
+	}
+
+	.field-search {
+		min-width: 0;
+	}
+
+	.candidate-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.inline-form {
+		grid-template-columns: 1fr auto;
+		align-items: end;
+	}
+
+	.form-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
