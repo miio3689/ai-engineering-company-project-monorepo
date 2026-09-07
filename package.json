@@ -1,21 +1,14 @@
 {
-  "name": "talent-pipeline-tracker",
+  "name": "brasaland-data-lab",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 --port 3000",
-    "build": "next build",
-    "start": "next start --hostname 0.0.0.0 --port 3000"
-  },
-  "dependencies": {
-    "next": "^15.1.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "dev": "vite src --host 0.0.0.0 --port 5173",
+    "build": "vite build src",
+    "preview": "vite preview --host 0.0.0.0 --port 4173"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
-    "@types/react": "^19.0.2",
-    "@types/react-dom": "^19.0.2",
-    "typescript": "^5.7.2"
+    "vite": "^5.4.10"
   }
 }

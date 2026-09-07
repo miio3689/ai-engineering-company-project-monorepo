@@ -34,6 +34,13 @@ export default function CandidateListFilters({
   const pathname = usePathname();
   const currentSearchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState(searchQuery);
+  const [lastSyncedQuery, setLastSyncedQuery] = useState(searchQuery);
+
+  // Resincroniza el input cuando la query cambia desde fuera (navegacion o limpiar filtros).
+  if (searchQuery !== lastSyncedQuery) {
+    setLastSyncedQuery(searchQuery);
+    setSearchInput(searchQuery);
+  }
 
   const updateUrl = useCallback(
     (key: "q" | "status" | "stage", value: string) => {
@@ -51,10 +58,6 @@ export default function CandidateListFilters({
     },
     [currentSearchParams, pathname, router],
   );
-
-  useEffect(() => {
-    setSearchInput(searchQuery);
-  }, [searchQuery]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
