@@ -224,7 +224,8 @@ export async function fetchCandidateById(id: string): Promise<Candidate | null> 
     throw new Error(`Error API ${response.status}: ${response.statusText}`);
   }
 
-  const record = (await response.json()) as RecordOut;
+  const payload = (await response.json()) as RecordOut | RecordResponse;
+  const record = extractRecord(payload);
   return mapRecordToCandidate(record);
 }
 

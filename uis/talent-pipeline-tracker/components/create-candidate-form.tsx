@@ -210,6 +210,7 @@ export default function CreateCandidateForm() {
               </option>
             ))}
           </select>
+          {errors.status && <span className="field-error">{errors.status}</span>}
         </label>
 
         <label>
@@ -226,6 +227,7 @@ export default function CreateCandidateForm() {
               </option>
             ))}
           </select>
+          {errors.stage && <span className="field-error">{errors.stage}</span>}
         </label>
 
         <div className="form-actions full-row">

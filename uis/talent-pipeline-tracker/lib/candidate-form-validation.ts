@@ -22,7 +22,18 @@ export interface CandidateFormErrors {
   resumeUrl?: string;
   yearsOfExperience?: string;
   appliedAt?: string;
+  status?: string;
+  stage?: string;
 }
+
+const VALID_STATUSES: CandidateStatus[] = ["received", "in_progress", "selected", "discarded"];
+const VALID_STAGES: CandidateStage[] = [
+  "pending",
+  "review",
+  "personal_interview",
+  "technical_interview",
+  "offer_presented",
+];
 
 function isValidUrl(value: string): boolean {
   try {
@@ -72,6 +83,14 @@ export function validateCandidateForm(values: CandidateFormValues): {
 
   if (!values.appliedAt.trim()) {
     errors.appliedAt = "La fecha de aplicacion es obligatoria.";
+  }
+
+  if (!VALID_STATUSES.includes(values.status)) {
+    errors.status = "Selecciona un estado valido.";
+  }
+
+  if (!VALID_STAGES.includes(values.stage)) {
+    errors.stage = "Selecciona una etapa valida.";
   }
 
   return {
