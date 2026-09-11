@@ -139,6 +139,15 @@ export default async function CandidatesPage({ searchParams }: CandidatesPagePro
               <p><strong>Puesto:</strong> {candidate.position}</p>
               <p><strong>Estado:</strong> {getStatusLabel(candidate.status)}</p>
               <p><strong>Etapa:</strong> {getStageLabel(candidate.stage)}</p>
+              <div className="candidate-actions">
+                <Link
+                  className="link-button"
+                  href={`/candidates/${candidate.id}${currentQuery}#editar-candidatura`}
+                  aria-label={`Editar candidatura de ${candidate.name}`}
+                >
+                  Editar
+                </Link>
+              </div>
             </li>
           ))}
         </ul>

@@ -319,6 +319,36 @@ body {
 	margin: 0.25rem 0;
 }
 
+.candidate-actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 0.75rem;
+}
+
+.link-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid transparent;
+	border-radius: 10px;
+	min-height: 2.3rem;
+	padding: 0.5rem 0.9rem;
+	background: var(--brand);
+	color: #ffffff;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.link-button:hover {
+	background: var(--brand-strong);
+	color: #ffffff;
+}
+
+.link-button:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+
 .empty-state {
 	background: var(--surface);
 	border: 1px dashed var(--border);

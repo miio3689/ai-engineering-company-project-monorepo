@@ -81,6 +81,8 @@ export default function CandidateDetailManager({
       setStatusLoading(true);
       const updated = await updateCandidateStatus(candidate.id, statusDraft);
       setCandidate(updated);
+      setStatusDraft(updated.status);
+      setStageDraft(updated.stage);
       setFormValues((prev) => ({ ...prev, status: updated.status, stage: updated.stage }));
       setStatusSuccess("Estado actualizado correctamente.");
     } catch (error) {
@@ -99,6 +101,8 @@ export default function CandidateDetailManager({
       setStageLoading(true);
       const updated = await updateCandidateStage(candidate.id, stageDraft);
       setCandidate(updated);
+      setStatusDraft(updated.status);
+      setStageDraft(updated.stage);
       setFormValues((prev) => ({ ...prev, status: updated.status, stage: updated.stage }));
       setStageSuccess("Etapa actualizada correctamente.");
     } catch (error) {
@@ -291,7 +295,7 @@ export default function CandidateDetailManager({
         )}
       </section>
 
-      <section className="form-panel" aria-label="Editar candidatura">
+      <section id="editar-candidatura" className="form-panel" aria-label="Editar candidatura">
         <h2>Editar candidatura</h2>
         <form className="form-grid" onSubmit={onEditCandidate} noValidate>
           <label>

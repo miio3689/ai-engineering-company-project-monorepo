@@ -127,6 +127,37 @@ function getApiBaseUrl(): string {
   return baseUrl.replace(/\/$/, "");
 }
 
+function getStringProperty(payload: unknown, key: string): string | null {
+  if (!payload || typeof payload !== "object" || !(key in payload)) {
+    return null;
+  }
+
+  const value = (payload as Record<string, unknown>)[key];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+async function buildApiErrorMessage(response: Response): Promise<string> {
+  const fallback = `Error API ${response.status}: ${response.statusText || "respuesta invalida"}`;
+
+  try {
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (contentType.includes("application/json")) {
+      const payload: unknown = await response.json();
+      const message = getStringProperty(payload, "message")
+        ?? getStringProperty(payload, "error")
+        ?? getStringProperty(payload, "detail");
+
+      return message ? `Error API ${response.status}: ${message}` : fallback;
+    }
+
+    const text = await response.text();
+    return text.trim() ? `Error API ${response.status}: ${text.trim()}` : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     method: "GET",
@@ -137,7 +168,7 @@ async function getJson<T>(path: string): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`Error API ${response.status}: ${response.statusText}`);
+    throw new Error(await buildApiErrorMessage(response));
   }
 
   return (await response.json()) as T;
@@ -158,7 +189,7 @@ async function sendJson<TResponse>(
   });
 
   if (!response.ok) {
-    throw new Error(`Error API ${response.status}: ${response.statusText}`);
+    throw new Error(await buildApiErrorMessage(response));
   }
 
   return (await response.json()) as TResponse;
@@ -198,7 +229,7 @@ async function sendNoContent(path: string, method: "DELETE"): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error(`Error API ${response.status}: ${response.statusText}`);
+    throw new Error(await buildApiErrorMessage(response));
   }
 }
 
@@ -221,7 +252,7 @@ export async function fetchCandidateById(id: string): Promise<Candidate | null> 
   }
 
   if (!response.ok) {
-    throw new Error(`Error API ${response.status}: ${response.statusText}`);
+    throw new Error(await buildApiErrorMessage(response));
   }
 
   const payload = (await response.json()) as RecordOut | RecordResponse;
