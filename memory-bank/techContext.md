@@ -18,21 +18,20 @@ memory-bank/
 
 uis/
 ├── website/
-├── backoffice/
-└── talent-pipeline-tracker/
+└── backoffice/
 
 services/
 ```
 
-`uis/talent-pipeline-tracker` belongs to Hito 3 and should remain isolated from the new Hito 4 applications unless a change is explicitly required.
+`uis/backoffice` contains the Hito 3 Talent Pipeline Tracker and remains a separate application from the public website and backend services.
 
 ## Existing technology
 
 ### Hito 2
 
-The repository root contains the TypeScript/Vite data-lab project.
+The TypeScript/Vite Data Lab is located at `uis/backoffice/data-lab/`.
 
-Current root package configuration:
+Its package configuration is isolated within that directory:
 
 ```json
 {
@@ -53,10 +52,10 @@ Hito 2 provides reusable TypeScript utilities for managing, transforming, valida
 
 ### Hito 3
 
-The Talent Pipeline Tracker is a Next.js application located exclusively at:
+The Talent Pipeline Tracker is a Next.js application located at:
 
 ```text
-uis/talent-pipeline-tracker/
+uis/backoffice/
 ```
 
 It uses TypeScript and includes its own application configuration, components, services and types.
@@ -90,8 +89,8 @@ The exact framework/template conventions for the new Hito 4 applications should 
 
 - Do not create a second repository.
 - Do not unnecessarily duplicate existing Hito 2 or Hito 3 functionality.
-- Keep Hito 3 under `uis/talent-pipeline-tracker`.
-- Keep Hito 2 root configuration intact unless a documented Hito 4 requirement requires a change.
+- Keep the Hito 3 Talent Pipeline Tracker under `uis/backoffice`.
+- Keep the Hito 2 Data Lab under `uis/backoffice/data-lab` unless a documented requirement requires a change.
 - The website and backoffice must be separate applications with their own appropriate structure.
 - The backoffice must have its own layout and landing view.
 - Company-relevant data or logic must be visible in the backoffice UI, not only logged to the console.

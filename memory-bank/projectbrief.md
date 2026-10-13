@@ -31,8 +31,8 @@ Hito 4 introduces an AI-assisted engineering setup and requires:
 The repository already contains previous milestones that must be preserved:
 
 - Hito 1: public/basic web work.
-- Hito 2: TypeScript data utilities in the `brasaland-data-lab` project at the repository root.
-- Hito 3: Talent Pipeline Tracker under `uis/talent-pipeline-tracker`.
+- Hito 2: TypeScript data utilities in `uis/backoffice/data-lab`.
+- Hito 3: Talent Pipeline Tracker under `uis/backoffice`.
 
 Hito 4 must build on this existing monorepo and must not unnecessarily duplicate or replace existing functionality.
 
