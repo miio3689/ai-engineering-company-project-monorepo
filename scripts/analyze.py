@@ -208,8 +208,8 @@ def print_report(metrics: Mapping[str, Any], source_path: str | Path) -> None:
     print(line)
 
 
-def export_results(metrics: Mapping[str, Any], output_path: str | Path = "results.csv") -> None:
-    """Export one row per metric to a spreadsheet-friendly CSV."""
+def results_rows(metrics: Mapping[str, Any]) -> list[tuple[str, Any, Any]]:
+    """Build the metric rows used by both CSV export interfaces."""
     rows: list[tuple[str, Any, Any]] = [
         ("total_records", metrics["total_records"], ""),
         ("valid_records", metrics["valid_records"], ""),
@@ -239,11 +239,15 @@ def export_results(metrics: Mapping[str, Any], output_path: str | Path = "result
             ),
         ]
     )
+    return rows
 
+
+def export_results(metrics: Mapping[str, Any], output_path: str | Path = "results.csv") -> None:
+    """Export one row per metric to a spreadsheet-friendly CSV."""
     with Path(output_path).open("w", encoding="utf-8", newline="") as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(("metric", "value", "percentage"))
-        writer.writerows(rows)
+        writer.writerows(results_rows(metrics))
 
 
 def main() -> None:
