@@ -172,8 +172,13 @@ def print_report(metrics: Mapping[str, Any], source_path: str | Path) -> None:
     print(f"  └─ Invalid / incomplete .......... {metrics['invalid_records']}")
     print()
     print("INVALID RECORDS BREAKDOWN")
-    for index, (rule, label) in enumerate(rule_labels):
-        branch = "└─" if index == len(rule_labels) - 1 else "├─"
+    displayed_rules = [
+        (rule, label)
+        for rule, label in rule_labels
+        if metrics["invalid_by_rule"][rule] > 0
+    ]
+    for index, (rule, label) in enumerate(displayed_rules):
+        branch = "└─" if index == len(displayed_rules) - 1 else "├─"
         print(f"  {branch} {label:<31} {metrics['invalid_by_rule'][rule]}")
     print()
     print("BREAKDOWN BY CATEGORY (valid records)")
