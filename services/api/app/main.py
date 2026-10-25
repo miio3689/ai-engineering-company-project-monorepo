@@ -35,7 +35,10 @@ EXPECTED_COLUMNS = (
 app = FastAPI(title="Brasaland Incidents API", version="1.0.0")
 allowed_origins = [
     origin.strip()
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:3000,https://cautious-meme-q7w9qr9ppxqqhx5rr-3000.app.github.dev",
+    ).split(",")
     if origin.strip()
 ]
 app.add_middleware(

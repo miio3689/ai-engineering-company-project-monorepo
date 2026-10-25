@@ -110,6 +110,9 @@ export default async function CandidatesPage({ searchParams }: CandidatesPagePro
       <header className="page-header">
         <h1 className="page-title">Listado de candidaturas</h1>
         <p className="page-subtitle">Gestiona y filtra candidaturas del pipeline de seleccion.</p>
+        <Link className="candidate-link" href="/incidents">
+          Análisis de incidencias
+        </Link>
       </header>
 
       <CandidateListFilters
