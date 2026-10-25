@@ -6,3 +6,7 @@ Cada subcarpeta dentro de `services/` debe corresponder a **un servicio concreto
 
 - **Propósito principal**: centralizar toda la lógica backend, APIs y consumidores de colas que dan soporte a los casos de uso de la compañía.
 - **Recomendación**: documenta en este archivo (o en sub-READMEs) los servicios que vayas añadiendo, su objetivo, tecnología usada y cómo ejecutarlos.
+
+## `api/` — Brasaland Incidents API
+
+API FastAPI para analizar CSV de incidencias y descargar las métricas del último análisis. Reutiliza las funciones de validación y métricas de `scripts/analyze.py`. Instrucciones de instalación y ejecución: [`api/README.md`](./api/README.md).
