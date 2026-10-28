@@ -113,6 +113,9 @@ export default async function CandidatesPage({ searchParams }: CandidatesPagePro
         <Link className="candidate-link" href="/incidents">
           Análisis de incidencias
         </Link>
+        <Link className="candidate-link" href="/suppliers">
+          Directorio de proveedores
+        </Link>
       </header>
 
       <CandidateListFilters

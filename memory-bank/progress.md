@@ -84,6 +84,28 @@ Validated operations include:
 
 Hito 4 should extend the current monorepo. Existing milestones should be preserved unless a change is explicitly required by the new milestone.
 
+## Milestone 09 - Supplier listing frontend
+
+- Added the read-only `/suppliers` page, linked from the main backoffice listing,
+  following the incident page's page/component/service/types structure.
+- Uses `NEXT_PUBLIC_API_BASE_URL` and the existing supplier response fields;
+  country and category filters trigger API requests with combined AND filters.
+- Displays currency-qualified rates, category labels and active/suspended badges,
+  plus loading, empty and error states with retry. Stale requests are aborted.
+- Verified with backend and frontend running together in Chromium: frontend HTTP
+  200, 15 seed suppliers, USA = 6, carne = 3, USA + carne = 1 (Miami Meat
+  Distributors LLC), all eight category filters and no document reloads.
+- Verified empty results, HTTP 503 error/retry, keyboard filter navigation and
+  layouts at 375, 768 and 1280 pixels without page horizontal overflow.
+- Typecheck, targeted ESLint and production build pass.
+- Production Lighthouse mobile performance: 94/100.
+- The main candidate page cannot render against the incident/supplier-only API:
+  its existing candidate request receives 404. The menu link is added using the
+  existing pattern; end-to-end navigation from that page requires the candidate
+  backend. No candidate API integration changes were made.
+- No supplier mutation UI added; API and incident page remain unchanged.
+- No commit made.
+
 ## Milestone 09 - Supplier directory API
 
 - Added the supplier router with create, list, detail, rate update, status
