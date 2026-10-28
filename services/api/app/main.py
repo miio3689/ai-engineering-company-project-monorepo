@@ -19,7 +19,10 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from scripts.analyze import calculate_metrics, results_rows, validate_record  # noqa: E402,F401
+from services.api.routes.auth import router as auth_router  # noqa: E402
+from services.api.routes.profiles import router as profiles_router  # noqa: E402
 from services.api.routes.suppliers import router as suppliers_router  # noqa: E402
+from services.api.routes.users import router as users_router  # noqa: E402
 
 EXPECTED_COLUMNS = (
     "incident_id",
@@ -35,6 +38,9 @@ EXPECTED_COLUMNS = (
 
 app = FastAPI(title="Brasaland Incidents API", version="1.0.0")
 app.include_router(suppliers_router)
+app.include_router(auth_router)
+app.include_router(users_router)
+app.include_router(profiles_router)
 allowed_origins = [
     origin.strip()
     for origin in os.getenv(
@@ -47,8 +53,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS", "PATCH", "DELETE"],
-    allow_headers=["Accept", "Content-Type"],
+    allow_methods=["GET", "POST", "OPTIONS", "PATCH", "PUT", "DELETE"],
+    allow_headers=["Accept", "Authorization", "Content-Type"],
 )
 _latest_metrics: dict[str, Any] | None = None
 _metrics_lock = Lock()
