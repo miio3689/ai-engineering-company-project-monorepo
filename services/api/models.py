@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
+import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class SupplierStatus(str, Enum):
@@ -68,3 +69,70 @@ class SupplierStatusUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: SupplierStatus
+
+
+class UserRole(str, Enum):
+    admin = "admin"
+    manager = "manager"
+    user = "user"
+
+
+class EmailModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, email: str) -> str:
+        local, separator, domain = email.partition("@")
+        local_pattern = r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+"
+        label_pattern = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+        valid = (
+            separator == "@"
+            and len(email) <= 254
+            and len(local) <= 64
+            and bool(re.fullmatch(local_pattern, local))
+            and not local.startswith(".")
+            and not local.endswith(".")
+            and ".." not in local
+            and len(domain) <= 253
+            and len(domain.split(".")) >= 2
+            and all(re.fullmatch(label_pattern, label) for label in domain.split("."))
+        )
+        if not valid:
+            raise ValueError("email must be a valid email address")
+        return email
+
+
+class UserCreate(EmailModel):
+    password: str
+    role: UserRole = UserRole.user
+
+
+class User(EmailModel):
+    id: int
+    hashed_password: str
+    is_active: bool = True
+    role: UserRole
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class UserResponse(EmailModel):
+    id: int
+    is_active: bool
+    role: UserRole
+    created_at: datetime
+
+
+class ProfileCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    phone: str | None = None
+    address: str | None = None
+
+
+class ProfileResponse(ProfileCreate):
+    id: int
+    user_id: int
