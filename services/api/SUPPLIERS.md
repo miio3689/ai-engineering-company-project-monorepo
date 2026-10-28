@@ -42,3 +42,41 @@ uv run python -m services.api.seed
 
 Las ejecuciones del seeder deben ser secuenciales: TinyDB no ofrece garantías
 para escrituras concurrentes de varios procesos.
+
+## API del directorio
+
+Desde la raiz del repositorio:
+
+```bash
+uv run uvicorn services.api.app.main:app --host 0.0.0.0 --port 8000
+```
+
+El router se monta en la API existente sin cambiar los endpoints de incidencias.
+Los cuerpos de peticion y las respuestas se documentan en `/docs`.
+
+| Metodo | Ruta | Resultado |
+| --- | --- | --- |
+| POST | `/suppliers` | Crea con `Supplier`; devuelve 201, `id` y `updated_at` UTC |
+| GET | `/suppliers` | Lista; filtros exactos opcionales `country` y `category`, combinados con AND |
+| GET | `/suppliers/{id}` | Detalle o 404 |
+| PATCH | `/suppliers/{id}/rate` | JSON `{"rate_per_unit": 29000}`; actualiza tarifa y fecha |
+| PATCH | `/suppliers/{id}/status` | JSON `{"status": "suspended"}`; conserva la fecha de tarifa |
+| DELETE | `/suppliers/{id}` | Elimina para corregir datos erroneos; devuelve 204 sin cuerpo |
+
+Los PATCH rechazan campos adicionales, incluido `updated_at`, con 422.
+El flujo habitual es suspender proveedores, no eliminarlos.
+Los IDs inexistentes devuelven 404. Los filtros sin coincidencias devuelven `[]`.
+
+Las operaciones del router se serializan dentro de un proceso para evitar
+escrituras TinyDB simultaneas desde los hilos de FastAPI. Ejecutar con un solo
+worker y no ejecutar el seeder mientras la API escribe.
+
+La configuracion CORS existente no se ha modificado: solo permite GET, POST y
+OPTIONS. PATCH y DELETE desde navegadores en otro origen requieren ampliar esa
+configuracion en una tarea posterior.
+
+Pruebas aisladas (usan una base temporal, no la base local):
+
+```bash
+uv run --group test python -m unittest discover -s services/api/tests -v
+```

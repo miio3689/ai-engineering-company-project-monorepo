@@ -56,3 +56,15 @@ class SupplierResponse(Supplier):
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+
+
+class SupplierRateUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rate_per_unit: float = Field(gt=0, allow_inf_nan=False)
+
+
+class SupplierStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: SupplierStatus

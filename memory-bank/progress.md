@@ -83,3 +83,19 @@ Validated operations include:
 ## Working principle
 
 Hito 4 should extend the current monorepo. Existing milestones should be preserved unless a change is explicitly required by the new milestone.
+
+## Milestone 09 - Supplier directory API
+
+- Added the supplier router with create, list, detail, rate update, status
+  update and delete endpoints, backed by the existing TinyDB storage.
+- Mounted the router in the existing API; incident handlers remain unchanged.
+- Rate and status updates use dedicated input models that reject extra fields.
+- Validated all requested HTTP cases against the seeded local database with
+  FastAPI TestClient. Removed the test supplier and verified that all 15
+  original documents, IDs and timestamps were preserved.
+- Eight isolated integration tests pass, including combined filters, 404
+  responses, rejection before opening TinyDB, field-level update isolation and
+  incident analysis/export regression checks.
+- Existing CORS remains unchanged and does not permit cross-origin PATCH or
+  DELETE. TinyDB writes require a single API worker and no concurrent seeder.
+- No commit made for this task.
