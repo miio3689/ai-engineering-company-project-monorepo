@@ -83,3 +83,58 @@ Validated operations include:
 ## Working principle
 
 Hito 4 should extend the current monorepo. Existing milestones should be preserved unless a change is explicitly required by the new milestone.
+
+## Milestone 09 - Supplier write actions
+
+- Added supplier creation with multiple categories, optional contact/notes,
+  client validation, reset, pending/success states and readable API 422 errors.
+- Added per-row rate editing and one-click suspend/activate; updates use returned
+  API records without page reloads and preserve existing filters.
+- No DELETE UI; no backend or incident page changes.
+- Chromium verification passed: creation with all fields, invalid country/currency
+  rejection, readable simulated 422 response, rate update from 12.50 to 19.75 USD,
+  client rejection of zero/negative rates without PATCH, suspend/activate badge
+  changes, existing filters, reset and responsive layouts.
+- Removed the test supplier via direct API DELETE (204) and compared all 15
+  original documents including IDs, rates, statuses and timestamps unchanged.
+- Typecheck, targeted ESLint and production build pass; the same browser write
+  checks also pass against the production build. Lighthouse mobile performance:
+  96/100. No commit made.
+
+## Milestone 09 - Supplier listing frontend
+
+- Added the read-only `/suppliers` page, linked from the main backoffice listing,
+  following the incident page's page/component/service/types structure.
+- Uses `NEXT_PUBLIC_API_BASE_URL` and the existing supplier response fields;
+  country and category filters trigger API requests with combined AND filters.
+- Displays currency-qualified rates, category labels and active/suspended badges,
+  plus loading, empty and error states with retry. Stale requests are aborted.
+- Verified with backend and frontend running together in Chromium: frontend HTTP
+  200, 15 seed suppliers, USA = 6, carne = 3, USA + carne = 1 (Miami Meat
+  Distributors LLC), all eight category filters and no document reloads.
+- Verified empty results, HTTP 503 error/retry, keyboard filter navigation and
+  layouts at 375, 768 and 1280 pixels without page horizontal overflow.
+- Typecheck, targeted ESLint and production build pass.
+- Production Lighthouse mobile performance: 94/100.
+- The main candidate page cannot render against the incident/supplier-only API:
+  its existing candidate request receives 404. The menu link is added using the
+  existing pattern; end-to-end navigation from that page requires the candidate
+  backend. No candidate API integration changes were made.
+- No supplier mutation UI added; API and incident page remain unchanged.
+- No commit made.
+
+## Milestone 09 - Supplier directory API
+
+- Added the supplier router with create, list, detail, rate update, status
+  update and delete endpoints, backed by the existing TinyDB storage.
+- Mounted the router in the existing API; incident handlers remain unchanged.
+- Rate and status updates use dedicated input models that reject extra fields.
+- Validated all requested HTTP cases against the seeded local database with
+  FastAPI TestClient. Removed the test supplier and verified that all 15
+  original documents, IDs and timestamps were preserved.
+- Eight isolated integration tests pass, including combined filters, 404
+  responses, rejection before opening TinyDB, field-level update isolation and
+  incident analysis/export regression checks.
+- Existing CORS remains unchanged and does not permit cross-origin PATCH or
+  DELETE. TinyDB writes require a single API worker and no concurrent seeder.
+- No commit made for this task.
