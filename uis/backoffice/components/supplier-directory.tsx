@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import CreateSupplierForm from "@/components/create-supplier-form";
+import SupplierActions from "@/components/supplier-actions";
 import { fetchSuppliers } from "@/services/suppliers";
 import {
   SUPPLIER_CATEGORIES,
@@ -50,6 +52,25 @@ export default function SupplierDirectory() {
     return () => controller.abort();
   }, [country, category, key]);
 
+  function handleSaved(supplier: Supplier) {
+    if (loading) {
+      setAttempt((value) => value + 1);
+      return;
+    }
+    setResult((current) => {
+      if (!current || current.key !== key) return current;
+      const matches = (!country || supplier.country === country)
+        && (!category || supplier.categories.includes(category));
+      const exists = current.suppliers.some((value) => value.id === supplier.id);
+      return {
+        ...current,
+        suppliers: exists
+          ? current.suppliers.map((value) => value.id === supplier.id ? supplier : value)
+          : matches ? [...current.suppliers, supplier] : current.suppliers,
+      };
+    });
+  }
+
   return (
     <>
       <header className="rounded-2xl border border-orange-200 bg-orange-50 p-5 sm:p-8">
@@ -59,6 +80,8 @@ export default function SupplierDirectory() {
           Consulta las tarifas vigentes y los proveedores de Colombia y Florida.
         </p>
       </header>
+
+      <CreateSupplierForm onSaved={handleSaved} />
 
       <section className="grid gap-4 rounded-2xl border border-gray-200 bg-white p-5 sm:grid-cols-2" aria-label="Filtros de proveedores">
         <div className="grid gap-2">
@@ -110,7 +133,7 @@ export default function SupplierDirectory() {
               <caption className="sr-only">Proveedores con los filtros seleccionados</caption>
               <thead className="border-b border-gray-300 bg-gray-50">
                 <tr>
-                  {["Nombre", "País", "Categorías", "Tarifa por unidad", "Estado"].map((heading) => (
+                  {["Nombre", "País", "Categorías", "Tarifa por unidad", "Estado", "Acciones"].map((heading) => (
                     <th key={heading} scope="col" className="px-3 py-3 font-semibold">{heading}</th>
                   ))}
                 </tr>
@@ -128,6 +151,9 @@ export default function SupplierDirectory() {
                       <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${supplier.status === SupplierStatus.Active ? "bg-green-100 text-green-900" : "bg-gray-200 text-gray-800"}`}>
                         {supplier.status === SupplierStatus.Active ? "Activo" : "Suspendido"}
                       </span>
+                    </td>
+                    <td className="px-3 py-4">
+                      <SupplierActions supplier={supplier} onSaved={handleSaved} />
                     </td>
                   </tr>
                 ))}

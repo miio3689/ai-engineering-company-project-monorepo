@@ -21,7 +21,18 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 La ruta `/suppliers`, enlazada desde el listado principal, permite consultar
 proveedores y filtrar por país y categoría. Los filtros se combinan con AND y
 consultan de nuevo la API sin recargar la página. Incluye estados de carga,
-error con reintento y listado vacío. Es una pantalla de solo lectura.
+error con reintento y listado vacío.
+
+El formulario permite dar de alta proveedores con varias categorías y los
+campos opcionales de contacto/notas. Comprueba nombre, categorías, tarifa
+positiva, correo opcional y correspondencia país/moneda antes de enviar.
+Los errores 422 se presentan como mensajes legibles y se conservan los datos
+para corregirlos. Incluye un botón para limpiar el formulario.
+
+Cada fila permite editar la tarifa y activar/suspender al proveedor.
+Las respuestas de POST/PATCH actualizan el listado y sus badges sin recargar
+la página ni cambiar los filtros: un alta solo se muestra si coincide con los
+filtros seleccionados. No existe acción de eliminación en la interfaz.
 
 Desde la raíz del monorepo, ejecutar en dos terminales:
 

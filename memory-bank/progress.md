@@ -84,6 +84,23 @@ Validated operations include:
 
 Hito 4 should extend the current monorepo. Existing milestones should be preserved unless a change is explicitly required by the new milestone.
 
+## Milestone 09 - Supplier write actions
+
+- Added supplier creation with multiple categories, optional contact/notes,
+  client validation, reset, pending/success states and readable API 422 errors.
+- Added per-row rate editing and one-click suspend/activate; updates use returned
+  API records without page reloads and preserve existing filters.
+- No DELETE UI; no backend or incident page changes.
+- Chromium verification passed: creation with all fields, invalid country/currency
+  rejection, readable simulated 422 response, rate update from 12.50 to 19.75 USD,
+  client rejection of zero/negative rates without PATCH, suspend/activate badge
+  changes, existing filters, reset and responsive layouts.
+- Removed the test supplier via direct API DELETE (204) and compared all 15
+  original documents including IDs, rates, statuses and timestamps unchanged.
+- Typecheck, targeted ESLint and production build pass; the same browser write
+  checks also pass against the production build. Lighthouse mobile performance:
+  96/100. No commit made.
+
 ## Milestone 09 - Supplier listing frontend
 
 - Added the read-only `/suppliers` page, linked from the main backoffice listing,

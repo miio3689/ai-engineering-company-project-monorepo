@@ -47,3 +47,8 @@ export interface SupplierFilters {
   country?: SupplierCountry;
   category?: SupplierCategory;
 }
+
+export type SupplierInput = Omit<Supplier, "id" | "updated_at" | "contact_email" | "notes"> & {
+  contact_email?: string;
+  notes?: string;
+};
