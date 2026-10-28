@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "brasaland-supplier-directory"
+version = "0.1.0"
+description = "TinyDB storage and seed command for the Brasaland supplier directory"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2,<3",
+    "tinydb>=4.8,<5",
+]
+
+[project.scripts]
+seed = "services.api.seed:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["services"]
