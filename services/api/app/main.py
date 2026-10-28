@@ -10,7 +10,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -23,6 +23,8 @@ from services.api.routes.auth import router as auth_router  # noqa: E402
 from services.api.routes.profiles import router as profiles_router  # noqa: E402
 from services.api.routes.suppliers import router as suppliers_router  # noqa: E402
 from services.api.routes.users import router as users_router  # noqa: E402
+from services.api.auth_security import get_current_user  # noqa: E402
+from services.api.models import UserResponse  # noqa: E402
 
 EXPECTED_COLUMNS = (
     "incident_id",
@@ -112,7 +114,10 @@ def parse_incident_csv(content: bytes) -> list[dict[str, str]]:
 
 
 @app.post("/api/incidents/analyze")
-async def analyze_incidents(file: UploadFile = File(...)) -> dict[str, Any]:
+async def analyze_incidents(
+    file: UploadFile = File(...),
+    current_user: UserResponse = Depends(get_current_user),
+) -> dict[str, Any]:
     """Analyze uploaded incident CSV records with the shared script functions."""
     global _latest_metrics
 
@@ -169,7 +174,9 @@ async def analyze_incidents(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 @app.get("/api/incidents/results/export")
-def export_latest_results() -> Response:
+def export_latest_results(
+    current_user: UserResponse = Depends(get_current_user),
+) -> Response:
     """Download the last analysis using the script's CSV metric row format."""
     with _metrics_lock:
         metrics = _latest_metrics

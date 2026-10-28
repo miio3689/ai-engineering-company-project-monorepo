@@ -3,14 +3,16 @@
 from datetime import datetime, timezone
 from threading import Lock
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
+from ..auth_security import get_current_user
 from ..database import get_suppliers_table
 from ..models import (
     Supplier,
     SupplierRateUpdate,
     SupplierResponse,
     SupplierStatusUpdate,
+    UserResponse,
 )
 
 router = APIRouter(prefix="/suppliers", tags=["suppliers"])
@@ -18,7 +20,10 @@ _database_lock = Lock()
 
 
 @router.post("", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED)
-def create_supplier(supplier: Supplier) -> SupplierResponse:
+def create_supplier(
+    supplier: Supplier,
+    current_user: UserResponse = Depends(get_current_user),
+) -> SupplierResponse:
     record = supplier.model_dump(mode="json")
     record["updated_at"] = datetime.now(timezone.utc).isoformat()
     with _database_lock, get_suppliers_table() as table:
@@ -28,7 +33,9 @@ def create_supplier(supplier: Supplier) -> SupplierResponse:
 
 @router.get("", response_model=list[SupplierResponse])
 def list_suppliers(
-    country: str | None = None, category: str | None = None
+    country: str | None = None,
+    category: str | None = None,
+    current_user: UserResponse = Depends(get_current_user),
 ) -> list[SupplierResponse]:
     with _database_lock, get_suppliers_table() as table:
         records = table.all()
@@ -41,7 +48,10 @@ def list_suppliers(
 
 
 @router.get("/{id}", response_model=SupplierResponse)
-def get_supplier(id: int) -> SupplierResponse:
+def get_supplier(
+    id: int,
+    current_user: UserResponse = Depends(get_current_user),
+) -> SupplierResponse:
     with _database_lock, get_suppliers_table() as table:
         record = table.get(doc_id=id)
     if record is None:
@@ -50,7 +60,11 @@ def get_supplier(id: int) -> SupplierResponse:
 
 
 @router.patch("/{id}/rate", response_model=SupplierResponse)
-def update_supplier_rate(id: int, update: SupplierRateUpdate) -> SupplierResponse:
+def update_supplier_rate(
+    id: int,
+    update: SupplierRateUpdate,
+    current_user: UserResponse = Depends(get_current_user),
+) -> SupplierResponse:
     with _database_lock, get_suppliers_table() as table:
         record = table.get(doc_id=id)
         if record is None:
@@ -64,7 +78,11 @@ def update_supplier_rate(id: int, update: SupplierRateUpdate) -> SupplierRespons
 
 
 @router.patch("/{id}/status", response_model=SupplierResponse)
-def update_supplier_status(id: int, update: SupplierStatusUpdate) -> SupplierResponse:
+def update_supplier_status(
+    id: int,
+    update: SupplierStatusUpdate,
+    current_user: UserResponse = Depends(get_current_user),
+) -> SupplierResponse:
     with _database_lock, get_suppliers_table() as table:
         record = table.get(doc_id=id)
         if record is None:
@@ -75,7 +93,10 @@ def update_supplier_status(id: int, update: SupplierStatusUpdate) -> SupplierRes
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_supplier(id: int) -> Response:
+def delete_supplier(
+    id: int,
+    current_user: UserResponse = Depends(get_current_user),
+) -> Response:
     """Correct erroneous records; normal procurement operations suspend suppliers."""
     with _database_lock, get_suppliers_table() as table:
         if table.get(doc_id=id) is None:
