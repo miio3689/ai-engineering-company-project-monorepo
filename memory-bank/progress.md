@@ -84,6 +84,98 @@ Validated operations include:
 
 Hito 4 should extend the current monorepo. Existing milestones should be preserved unless a change is explicitly required by the new milestone.
 
+## AUTH-02 - Account profile and logout
+
+- Added protected `/account/profile`, using the existing unchanged guard.
+  `GET /auth/me` loads read-only email and linked name/phone/address through the
+  shared Bearer API client. `PUT /profiles/me` sends only editable fields and
+  displays the returned profile immediately, with saving/success/error states.
+- Added client-side name validation, optional-field clearing as `null`, reset
+  to the last saved values, abortable account loading and load retry.
+  Accounts with `profile: null` explicitly explain that the API only updates
+  existing profiles; no unsupported creation request is made.
+- Added shared internal navigation with profile access and logout. Logout
+  removes the token, notifies the existing guard via its storage subscription
+  and replaces the document with `/login`, discarding the in-memory router
+  cache. Storage failures are explicit and do not claim successful logout.
+- Chromium against the real API and production build verified profile/email
+  loading, authenticated PUT payload/header, immediate name update, persistence
+  after reload, clearing optional fields, validation/reset, readable simulated
+  load/save failures and retry, missing profile, and centralized PUT 401 logout.
+- Verified direct anonymous profile access redirects without requesting account
+  data. Logout removes localStorage token and navigates to login; browser Back
+  re-enters the unchanged guard and returns to login, with frame-level checks
+  confirming no visible cached profile field without a token.
+- Responsive layouts pass at 375/768/1280px. Authenticated mobile Lighthouse:
+  performance 99, accessibility 100. Fifteen automated authentication/account
+  regression tests, typecheck, targeted ESLint, production build and diff checks
+  pass. Tests used isolated users; existing user storage was not modified.
+- Guard, Website, Data Lab, backend and business pages remain unchanged.
+  No commit made.
+
+## AUTH-02 - Client-side route protection
+
+- Added a single client guard in the existing root layout, without moving or
+  changing business pages. Only `/login` and `/register` are public; `/`,
+  `/incidents`, `/suppliers`, candidate details and other internal paths require
+  a non-empty localStorage token.
+- SSR/hydration display a checking state rather than protected UI. Missing
+  tokens trigger `router.replace("/login")`; blocked storage shows an explicit
+  error. Route changes, storage events, focus and page restoration recheck the
+  session. No Next.js middleware or backend changes.
+- Chromium checks against the production build passed: direct anonymous access
+  to the three main routes, candidate detail and an unknown internal path
+  redirects without displaying protected content; login/register remain public
+  with and without tokens; JavaScript-disabled pages show only the checking
+  state; blocked storage, cross-tab logout and same-tab logout followed by
+  focus/navigation are handled.
+- Real API registration/login produced a valid token verified by `/auth/me`.
+  Incidents rendered normally and suppliers loaded all 15 existing rows.
+  The root still encounters the existing `/records` 404 from the real API.
+  Separate read-only candidate fixtures, added only to the test process,
+  confirmed normal authenticated Tracker listing/detail and no visible
+  candidate data before anonymous redirects. No repository backend was changed.
+- Verified the unchanged public website `/` and `/application.html`: HTTP 200,
+  visible content without a token, no guard and no redirect.
+- Eleven existing authentication regression tests, typecheck, targeted ESLint,
+  production build and diff checks pass. Website, Data Lab and business page
+  files remain unchanged. Test servers stopped and isolated test data removed.
+- This is a browser UI guard, not server-side authorization: existing Next.js
+  server components still execute/serialize normally and API authentication
+  remains responsible for protecting data.
+- No commit made.
+
+## AUTH-02 - Backoffice authentication flows
+
+- Added `/login` and `/register` following the existing page/component/hook/
+  service/types structure. Login uses OAuth form data (`username=email`);
+  registration uses public JSON and automatically logs in after creation.
+- Successful authentication stores the returned token under `access_token` in
+  browser localStorage and navigates to `/`. Registration errors appear beside
+  their fields, including duplicate email (409), FastAPI validation (422), and
+  the name required when phone/address are supplied.
+- Centralized existing candidate, supplier and incident requests through
+  `services/api-client.ts`: reads the browser token per request, sends Bearer
+  authorization, and clears storage/navigates to `/login` on protected 401.
+  Public authentication failures stay on the form.
+- Chromium verification against the real API and production frontend passed:
+  registration with/without optional profile, automatic login and exact stored
+  token, `/auth/me` profile confirmation, manual storage logout and subsequent
+  login, incorrect credentials, duplicate email field error, existing 15-row
+  supplier listing with Bearer header, and a genuinely expired signed JWT
+  clearing the token and redirecting. Also checked simulated 422 field errors
+  and automatic-login failure after successful registration.
+- Verified validation focus, reset, and 375/768/1280px layouts without overflow.
+  Eleven automated regression tests, typecheck, targeted ESLint and production
+  build pass. Isolated mobile Lighthouse scores: login 99 performance/100
+  accessibility; register 98 performance/100 accessibility.
+- Existing limitation remains: `services/api` has no `/records` endpoint.
+  Navigation to `/` succeeds, but the Tracker cannot load its candidate data
+  from this API. Existing server components cannot read browser localStorage;
+  their loading model was not changed.
+- Used an isolated authentication test database, not the existing user store.
+  No route guards, website/Data Lab changes, backend changes, or commit.
+
 ## Milestone 09 - Supplier write actions
 
 - Added supplier creation with multiple categories, optional contact/notes,
