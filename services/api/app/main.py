@@ -10,7 +10,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -19,7 +19,12 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from scripts.analyze import calculate_metrics, results_rows, validate_record  # noqa: E402,F401
+from services.api.routes.auth import router as auth_router  # noqa: E402
+from services.api.routes.profiles import router as profiles_router  # noqa: E402
 from services.api.routes.suppliers import router as suppliers_router  # noqa: E402
+from services.api.routes.users import router as users_router  # noqa: E402
+from services.api.auth_security import get_current_user  # noqa: E402
+from services.api.models import UserResponse  # noqa: E402
 
 EXPECTED_COLUMNS = (
     "incident_id",
@@ -35,6 +40,9 @@ EXPECTED_COLUMNS = (
 
 app = FastAPI(title="Brasaland Incidents API", version="1.0.0")
 app.include_router(suppliers_router)
+app.include_router(auth_router)
+app.include_router(users_router)
+app.include_router(profiles_router)
 allowed_origins = [
     origin.strip()
     for origin in os.getenv(
@@ -47,8 +55,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS", "PATCH", "DELETE"],
-    allow_headers=["Accept", "Content-Type"],
+    allow_methods=["GET", "POST", "OPTIONS", "PATCH", "PUT", "DELETE"],
+    allow_headers=["Accept", "Authorization", "Content-Type"],
 )
 _latest_metrics: dict[str, Any] | None = None
 _metrics_lock = Lock()
@@ -106,7 +114,10 @@ def parse_incident_csv(content: bytes) -> list[dict[str, str]]:
 
 
 @app.post("/api/incidents/analyze")
-async def analyze_incidents(file: UploadFile = File(...)) -> dict[str, Any]:
+async def analyze_incidents(
+    file: UploadFile = File(...),
+    current_user: UserResponse = Depends(get_current_user),
+) -> dict[str, Any]:
     """Analyze uploaded incident CSV records with the shared script functions."""
     global _latest_metrics
 
@@ -163,7 +174,9 @@ async def analyze_incidents(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 @app.get("/api/incidents/results/export")
-def export_latest_results() -> Response:
+def export_latest_results(
+    current_user: UserResponse = Depends(get_current_user),
+) -> Response:
     """Download the last analysis using the script's CSV metric row format."""
     with _metrics_lock:
         metrics = _latest_metrics

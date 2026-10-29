@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from services.api import database, seed
+from services.api import database, seed, services_auth
 from services.api.app import main
 from services.api.routes import suppliers
 
@@ -23,11 +23,33 @@ class SupplierEndpointsTests(unittest.TestCase):
         )
         self.path_patch.start()
         self.addCleanup(self.path_patch.stop)
+        self.auth_path_patch = patch.object(
+            services_auth,
+            "AUTH_DATABASE_PATH",
+            Path(self.temporary.name) / "auth.json",
+        )
+        self.auth_path_patch.start()
+        self.addCleanup(self.auth_path_patch.stop)
         with redirect_stdout(io.StringIO()):
             seed.main()
         self.client = TestClient(main.app)
         self.addCleanup(self.client.close)
+        self.client.headers.update(self._authenticated_headers())
         self.payload = dict(seed.SUPPLIERS_SEED[0], name="Supplier endpoint test")
+
+    def _authenticated_headers(self):
+        email = "supplier-tests@example.com"
+        password = "supplier-tests-password"
+        registration = self.client.post(
+            "/users", json={"email": email, "password": password}
+        )
+        self.assertEqual(registration.status_code, 201)
+        login = self.client.post(
+            "/auth/login",
+            data={"username": email, "password": password},
+        )
+        self.assertEqual(login.status_code, 200)
+        return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
     def test_create_detail_delete(self):
         response = self.client.post("/suppliers", json=self.payload)
