@@ -84,6 +84,35 @@ Validated operations include:
 
 Hito 4 should extend the current monorepo. Existing milestones should be preserved unless a change is explicitly required by the new milestone.
 
+## AUTH-02 - Account profile and logout
+
+- Added protected `/account/profile`, using the existing unchanged guard.
+  `GET /auth/me` loads read-only email and linked name/phone/address through the
+  shared Bearer API client. `PUT /profiles/me` sends only editable fields and
+  displays the returned profile immediately, with saving/success/error states.
+- Added client-side name validation, optional-field clearing as `null`, reset
+  to the last saved values, abortable account loading and load retry.
+  Accounts with `profile: null` explicitly explain that the API only updates
+  existing profiles; no unsupported creation request is made.
+- Added shared internal navigation with profile access and logout. Logout
+  removes the token, notifies the existing guard via its storage subscription
+  and replaces the document with `/login`, discarding the in-memory router
+  cache. Storage failures are explicit and do not claim successful logout.
+- Chromium against the real API and production build verified profile/email
+  loading, authenticated PUT payload/header, immediate name update, persistence
+  after reload, clearing optional fields, validation/reset, readable simulated
+  load/save failures and retry, missing profile, and centralized PUT 401 logout.
+- Verified direct anonymous profile access redirects without requesting account
+  data. Logout removes localStorage token and navigates to login; browser Back
+  re-enters the unchanged guard and returns to login, with frame-level checks
+  confirming no visible cached profile field without a token.
+- Responsive layouts pass at 375/768/1280px. Authenticated mobile Lighthouse:
+  performance 99, accessibility 100. Fifteen automated authentication/account
+  regression tests, typecheck, targeted ESLint, production build and diff checks
+  pass. Tests used isolated users; existing user storage was not modified.
+- Guard, Website, Data Lab, backend and business pages remain unchanged.
+  No commit made.
+
 ## AUTH-02 - Client-side route protection
 
 - Added a single client guard in the existing root layout, without moving or

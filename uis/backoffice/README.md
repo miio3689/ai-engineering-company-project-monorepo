@@ -73,6 +73,26 @@ npm run test:auth
 npm run typecheck
 ```
 
+## Gestión de cuenta
+
+`/account/profile` queda bajo el guard cliente existente. Carga email y perfil
+con `GET /auth/me` a través del cliente API centralizado; el email es solo de
+lectura. Permite editar nombre, teléfono y dirección con `PUT /profiles/me`,
+mostrando la respuesta guardada inmediatamente, confirmación y errores
+legibles. Los campos opcionales vacíos se envían como `null`; restablecer
+recupera los últimos valores guardados. La carga fallida permite reintentar.
+
+Si `/auth/me` devuelve `profile: null`, se muestra el email y se informa de que
+hay que contactar con la administración: `PUT /profiles/me` no crea perfiles.
+No se intenta un alta con un endpoint inexistente.
+
+La navegación compartida de las vistas internas incluye «Mi perfil» y
+«Cerrar sesión». Logout elimina `access_token`, notifica al guard existente
+y reemplaza el documento por `/login`, descartando la caché en memoria del
+router. Al volver atrás, el guard vuelve a comprobar la sesión. No se cambia
+el guard ni se añade middleware. El cierre es local: no revoca el JWT en la
+API, que conserva su caducidad normal.
+
 ## Directorio de proveedores
 
 La ruta `/suppliers`, enlazada desde el listado principal, permite consultar

@@ -28,6 +28,7 @@ const { validateAuthForm } = await import("../lib/auth-form-validation.ts");
 const { fetchSuppliers, createSupplier, updateSupplierRate, updateSupplierStatus } = await import("../services/suppliers.ts");
 const { analyzeIncidentCsv, downloadIncidentAnalysisCsv } = await import("../services/incident-analysis.ts");
 const { fetchCandidates, fetchCandidateById } = await import("../services/api.ts");
+const { fetchAccount, updateProfile } = await import("../services/account.ts");
 
 const originalFetch = globalThis.fetch;
 const originalWindow = globalThis.window;
@@ -199,6 +200,57 @@ test("incident downloads also clear the session on 401", async () => {
   await assert.rejects(downloadIncidentAnalysisCsv(), /sesión ha caducado/);
   assert.equal(storage.has(ACCESS_TOKEN_KEY), false);
   assert.deepEqual(redirects, ["/login"]);
+});
+
+test("account loading uses GET /auth/me with Bearer token and abort support", async () => {
+  browser();
+  const account = { email: "test@example.com", role: "user", profile: { id: 2, user_id: 1, name: "Test", phone: null, address: "Street" } };
+  const signal = new AbortController().signal;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "http://api.test/auth/me");
+    assert.equal(options.headers.get("Authorization"), "Bearer first-token");
+    assert.equal(options.signal, signal);
+    assert.equal(options.cache, "no-store");
+    return Response.json(account);
+  };
+  assert.deepEqual(await fetchAccount(signal), account);
+});
+
+test("profile update uses PUT with only editable fields and returned server profile", async () => {
+  browser();
+  const profile = { id: 2, user_id: 1, name: "Updated", phone: null, address: "Street" };
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "http://api.test/profiles/me");
+    assert.equal(options.method, "PUT");
+    assert.equal(options.headers.get("Authorization"), "Bearer first-token");
+    assert.equal(options.headers.get("Content-Type"), "application/json");
+    assert.deepEqual(JSON.parse(options.body), { name: "Updated", phone: null, address: "Street" });
+    return Response.json(profile);
+  };
+  assert.deepEqual(await updateProfile({ ...profile, email: "not-sent@example.com" }), profile);
+});
+
+test("missing profile remains null and profile API failures are readable", async () => {
+  const input = { name: "Test", phone: null, address: null };
+  respond({ email: "test@example.com", role: "user", profile: null });
+  assert.equal((await fetchAccount()).profile, null);
+  respond({ detail: "No tiene un perfil." }, 404);
+  await assert.rejects(updateProfile(input), /No hay un perfil asociado/);
+  respond({ detail: [{ loc: ["body", "name"], msg: "invalid" }] }, 422);
+  await assert.rejects(updateProfile(input), /Revisa el nombre/);
+  respond({}, 503);
+  await assert.rejects(fetchAccount(), /cargar la cuenta \(HTTP 503\)/);
+  await assert.rejects(updateProfile(input), /guardar el perfil \(HTTP 503\)/);
+});
+
+test("both account endpoints retain central 401 logout handling", async () => {
+  for (const request of [() => fetchAccount(), () => updateProfile({ name: "Test", phone: null, address: null })]) {
+    const { storage, redirects } = browser();
+    respond({}, 401);
+    await assert.rejects(request(), /sesión ha caducado/);
+    assert.equal(storage.has(ACCESS_TOKEN_KEY), false);
+    assert.deepEqual(redirects, ["/login"]);
+  }
 });
 
 test.after(() => {

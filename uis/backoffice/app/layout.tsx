@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import AuthGuard from "@/components/auth-guard";
+import BackofficeNavigation from "@/components/backoffice-navigation";
 
 import "./globals.css";
 
@@ -17,7 +18,12 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="es">
-      <body><AuthGuard>{children}</AuthGuard></body>
+      <body>
+        <AuthGuard>
+          <BackofficeNavigation />
+          {children}
+        </AuthGuard>
+      </body>
     </html>
   );
 }
