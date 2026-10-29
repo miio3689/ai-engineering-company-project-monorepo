@@ -33,8 +33,23 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 e incidencias. En el navegador lee el token antes de cada petición y añade
 `Authorization: Bearer <token>`. Un 401 protegido elimina el token y navega a
 `/login`; las peticiones públicas de login/registro no llevan token ni activan
-esta redirección. No se han añadido guards: la ausencia de token, por sí sola,
-no impide abrir una ruta.
+esta redirección.
+
+El layout raíz envuelve las rutas con `components/auth-guard.tsx`, un guard
+exclusivamente cliente. Solo `/login` y `/register` son públicas; cualquier
+otra ruta, incluidas las candidaturas por ID y las nuevas vistas internas,
+requiere un token no vacío. Durante SSR e hidratación se muestra
+«Comprobando sesión…», sin montar el contenido protegido. Si falta el token,
+se usa `router.replace("/login")`; si el almacenamiento está bloqueado, se
+muestra un error explícito sin revelar la vista. Se vuelve a comprobar al
+cambiar de ruta, recuperar el foco, restaurar la página o recibir cambios
+de almacenamiento desde otra pestaña. Las vistas públicas siguen accesibles
+incluso con sesión iniciada.
+
+No hay middleware ni comprobación local de la firma/caducidad: la API valida
+el token y el cliente conserva el manejo de 401. El guard evita mostrar las
+vistas en el navegador; no sustituye la autorización del backend ni evita la
+ejecución o serialización de componentes de servidor de Next.js.
 
 Los componentes de servidor existentes no tienen acceso a `localStorage`.
 No se cambia su modelo de carga en esta tarea. Además, `services/api` no
