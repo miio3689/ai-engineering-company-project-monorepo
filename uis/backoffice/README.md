@@ -16,6 +16,48 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Autenticación (AUTH-02)
+
+- `/login` envía `POST /auth/login` como
+  `application/x-www-form-urlencoded`, con `username=email` y `password`.
+- `/register` envía JSON a `POST /users`, sin token, y después inicia sesión
+  automáticamente. Incluye email, contraseña y nombre/teléfono/dirección
+  opcionales. Si se indica teléfono o dirección, la API exige nombre.
+- Ambos flujos guardan el `access_token` devuelto en la clave `access_token`
+  de `localStorage` y redirigen a `/` (Talent Pipeline Tracker).
+- Los errores 409 por email duplicado y los errores 422 de validación se
+  muestran junto al campo correspondiente. Si la cuenta se crea pero falla
+  el login automático, se indica que hay que usar `/login`, sin repetir el alta.
+
+`services/api-client.ts` centraliza las peticiones de candidaturas, proveedores
+e incidencias. En el navegador lee el token antes de cada petición y añade
+`Authorization: Bearer <token>`. Un 401 protegido elimina el token y navega a
+`/login`; las peticiones públicas de login/registro no llevan token ni activan
+esta redirección. No se han añadido guards: la ausencia de token, por sí sola,
+no impide abrir una ruta.
+
+Los componentes de servidor existentes no tienen acceso a `localStorage`.
+No se cambia su modelo de carga en esta tarea. Además, `services/api` no
+implementa `/records`, que consume el Tracker: la redirección a `/` funciona,
+pero mostrar candidaturas requiere disponer de ese backend.
+
+Usar la misma `NEXT_PUBLIC_API_BASE_URL` y los comandos de API/Next.js
+documentados abajo. Para simular logout manual en las herramientas de
+desarrollo del navegador:
+
+```js
+localStorage.removeItem("access_token");
+```
+
+Pruebas de regresión del cliente, contratos y validación (Node.js >= 22.15,
+sin dependencias adicionales a las del proyecto):
+
+```bash
+cd uis/backoffice
+npm run test:auth
+npm run typecheck
+```
+
 ## Directorio de proveedores
 
 La ruta `/suppliers`, enlazada desde el listado principal, permite consultar

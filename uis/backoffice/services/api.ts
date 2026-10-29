@@ -1,4 +1,5 @@
 import type { Candidate, CandidateNote, CandidateStage, CandidateStatus } from "@/types/models";
+import { apiRequest } from "@/services/api-client";
 
 interface RecordOut {
   id: string;
@@ -117,16 +118,6 @@ function mapCandidatePayloadToApi(payload: CandidatePayload): Omit<RecordOut, "i
   };
 }
 
-function getApiBaseUrl(): string {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-  if (!baseUrl) {
-    throw new Error("Falta NEXT_PUBLIC_API_BASE_URL en el entorno.");
-  }
-
-  return baseUrl.replace(/\/$/, "");
-}
-
 function getStringProperty(payload: unknown, key: string): string | null {
   if (!payload || typeof payload !== "object" || !(key in payload)) {
     return null;
@@ -159,7 +150,7 @@ async function buildApiErrorMessage(response: Response): Promise<string> {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+  const response = await apiRequest(path, {
     method: "GET",
     cache: "no-store",
     headers: {
@@ -179,7 +170,7 @@ async function sendJson<TResponse>(
   method: "POST" | "PUT" | "PATCH",
   body: unknown,
 ): Promise<TResponse> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+  const response = await apiRequest(path, {
     method,
     cache: "no-store",
     headers: {
@@ -220,7 +211,7 @@ function extractNotes(payload: CandidateNoteOut[] | CandidateNotesResponse): Can
 }
 
 async function sendNoContent(path: string, method: "DELETE"): Promise<void> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+  const response = await apiRequest(path, {
     method,
     cache: "no-store",
     headers: {
@@ -239,7 +230,7 @@ export async function fetchCandidates(): Promise<Candidate[]> {
 }
 
 export async function fetchCandidateById(id: string): Promise<Candidate | null> {
-  const response = await fetch(`${getApiBaseUrl()}/records/${id}`, {
+  const response = await apiRequest(`/records/${id}`, {
     method: "GET",
     cache: "no-store",
     headers: {

@@ -84,6 +84,37 @@ Validated operations include:
 
 Hito 4 should extend the current monorepo. Existing milestones should be preserved unless a change is explicitly required by the new milestone.
 
+## AUTH-02 - Backoffice authentication flows
+
+- Added `/login` and `/register` following the existing page/component/hook/
+  service/types structure. Login uses OAuth form data (`username=email`);
+  registration uses public JSON and automatically logs in after creation.
+- Successful authentication stores the returned token under `access_token` in
+  browser localStorage and navigates to `/`. Registration errors appear beside
+  their fields, including duplicate email (409), FastAPI validation (422), and
+  the name required when phone/address are supplied.
+- Centralized existing candidate, supplier and incident requests through
+  `services/api-client.ts`: reads the browser token per request, sends Bearer
+  authorization, and clears storage/navigates to `/login` on protected 401.
+  Public authentication failures stay on the form.
+- Chromium verification against the real API and production frontend passed:
+  registration with/without optional profile, automatic login and exact stored
+  token, `/auth/me` profile confirmation, manual storage logout and subsequent
+  login, incorrect credentials, duplicate email field error, existing 15-row
+  supplier listing with Bearer header, and a genuinely expired signed JWT
+  clearing the token and redirecting. Also checked simulated 422 field errors
+  and automatic-login failure after successful registration.
+- Verified validation focus, reset, and 375/768/1280px layouts without overflow.
+  Eleven automated regression tests, typecheck, targeted ESLint and production
+  build pass. Isolated mobile Lighthouse scores: login 99 performance/100
+  accessibility; register 98 performance/100 accessibility.
+- Existing limitation remains: `services/api` has no `/records` endpoint.
+  Navigation to `/` succeeds, but the Tracker cannot load its candidate data
+  from this API. Existing server components cannot read browser localStorage;
+  their loading model was not changed.
+- Used an isolated authentication test database, not the existing user store.
+  No route guards, website/Data Lab changes, backend changes, or commit.
+
 ## Milestone 09 - Supplier write actions
 
 - Added supplier creation with multiple categories, optional contact/notes,
