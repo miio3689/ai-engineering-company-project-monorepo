@@ -1,8 +1,11 @@
 """TinyDB services for authentication users and their profiles."""
 
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import hashlib
+import os
 from pathlib import Path
+import secrets
 from threading import RLock
 from typing import Iterator
 
@@ -21,13 +24,32 @@ from .models import (
 )
 
 AUTH_DATABASE_PATH = Path(__file__).resolve().with_name("auth.json")
+PASSWORD_RESET_EXPIRE_MINUTES = int(
+    os.getenv("PASSWORD_RESET_EXPIRE_MINUTES", "30")
+)
+if not 15 <= PASSWORD_RESET_EXPIRE_MINUTES <= 60:
+    raise ValueError("PASSWORD_RESET_EXPIRE_MINUTES must be between 15 and 60")
 _database_lock = RLock()
+
+
+class InvalidResetTokenError(ValueError):
+    """Raised when a password reset token is invalid, expired, or used."""
+
+
+class IncorrectCurrentPasswordError(ValueError):
+    """Raised when a user's current password cannot be verified."""
 
 
 @contextmanager
 def _get_auth_tables() -> Iterator[tuple[Table, Table]]:
     with TinyDB(AUTH_DATABASE_PATH) as database:
         yield database.table("users"), database.table("profiles")
+
+
+@contextmanager
+def _get_password_reset_tables() -> Iterator[tuple[Table, Table]]:
+    with TinyDB(AUTH_DATABASE_PATH) as database:
+        yield database.table("users"), database.table("password_reset_tokens")
 
 
 def _find_user_by_email(table: Table, email: str) -> dict | None:
@@ -85,6 +107,79 @@ def autenticar_usuario(email: str, password: str) -> UserResponse | None:
         role=user.role,
         created_at=user.created_at,
     )
+
+
+def create_reset_token(email: str) -> str | None:
+    now = datetime.now(timezone.utc)
+    token = secrets.token_urlsafe()
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    expires_at = now + timedelta(minutes=PASSWORD_RESET_EXPIRE_MINUTES)
+
+    with _database_lock, _get_password_reset_tables() as (users, reset_tokens):
+        user = _find_user_by_email(users, email)
+        if user is None:
+            return None
+
+        previous_valid_tokens = [
+            record.doc_id
+            for record in reset_tokens.all()
+            if record["user_id"] == user.doc_id
+            and record["used_at"] is None
+            and datetime.fromisoformat(record["expires_at"]) > now
+        ]
+        if previous_valid_tokens:
+            reset_tokens.update(
+                {"used_at": now.isoformat()}, doc_ids=previous_valid_tokens
+            )
+
+        reset_tokens.insert(
+            {
+                "token_hash": token_hash,
+                "user_id": user.doc_id,
+                "expires_at": expires_at.isoformat(),
+                "used_at": None,
+            }
+        )
+    return token
+
+
+def reset_password(token: str, new_password: str) -> None:
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    now = datetime.now(timezone.utc)
+
+    with _database_lock, _get_password_reset_tables() as (users, reset_tokens):
+        reset_record = next(
+            (
+                record
+                for record in reset_tokens.all()
+                if secrets.compare_digest(record["token_hash"], token_hash)
+            ),
+            None,
+        )
+        if (
+            reset_record is None
+            or reset_record["used_at"] is not None
+            or datetime.fromisoformat(reset_record["expires_at"]) <= now
+        ):
+            raise InvalidResetTokenError("El token de restablecimiento no es válido.")
+
+        user_id = reset_record["user_id"]
+        if users.get(doc_id=user_id) is None:
+            raise InvalidResetTokenError("El token de restablecimiento no es válido.")
+
+        users.update({"hashed_password": bcrypt.hash(new_password)}, doc_ids=[user_id])
+        reset_tokens.update({"used_at": now.isoformat()}, doc_ids=[reset_record.doc_id])
+
+
+def change_password(user_id: int, current_password: str, new_password: str) -> None:
+    with _database_lock, _get_auth_tables() as (users, _):
+        user = users.get(doc_id=user_id)
+        if user is None or not bcrypt.verify(current_password, user["hashed_password"]):
+            raise IncorrectCurrentPasswordError("La contraseña actual es incorrecta.")
+
+        users.update(
+            {"hashed_password": bcrypt.hash(new_password)}, doc_ids=[user_id]
+        )
 
 
 def crear_usuario(data: UserCreate) -> UserResponse:
