@@ -1,13 +1,47 @@
 """Login and current-user endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+import os
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from .. import services_auth
+from .. import email_service, services_auth
 from ..auth_security import create_access_token, get_current_user
-from ..models import AuthMeResponse, UserResponse
+from ..models import (
+    AuthMeResponse,
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    UserResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
+FORGOT_PASSWORD_MESSAGE = (
+    "Si existe una cuenta con ese correo, recibirás instrucciones para "
+    "restablecer tu contraseña."
+)
+
+
+def _create_and_send_reset_email(to_email: str) -> None:
+    try:
+        token = services_auth.create_reset_token(to_email)
+        if token is None:
+            return
+        frontend_base_url = os.getenv(
+            "FRONTEND_BASE_URL", "http://localhost:3000"
+        ).rstrip("/")
+        reset_url = (
+            f"{frontend_base_url}/reset-password?{urlencode({'token': token})}"
+        )
+        email_service.send_password_reset_email(to_email, reset_url)
+    except Exception as exc:
+        logger.error(
+            "No se pudo procesar el correo de restablecimiento (tipo: %s).",
+            type(exc).__name__,
+        )
 
 
 @router.post("/login")
@@ -23,6 +57,38 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()) -> dict[str, str]:
         "access_token": create_access_token(user.id),
         "token_type": "bearer",
     }
+
+
+@router.post("/forgot-password")
+def forgot_password(
+    data: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+) -> dict[str, str]:
+    background_tasks.add_task(_create_and_send_reset_email, data.email)
+    return {"message": FORGOT_PASSWORD_MESSAGE}
+
+
+@router.post("/reset-password")
+def reset_password(data: ResetPasswordRequest) -> dict[str, str]:
+    try:
+        services_auth.reset_password(data.token, data.new_password)
+    except services_auth.InvalidResetTokenError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"message": "Contraseña restablecida correctamente."}
+
+
+@router.post("/change-password")
+def change_password(
+    data: ChangePasswordRequest,
+    current_user: UserResponse = Depends(get_current_user),
+) -> dict[str, str]:
+    try:
+        services_auth.change_password(
+            current_user.id, data.current_password, data.new_password
+        )
+    except services_auth.IncorrectCurrentPasswordError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"message": "Contraseña actualizada correctamente."}
 
 
 @router.get("/me", response_model=AuthMeResponse)

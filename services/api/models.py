@@ -105,6 +105,24 @@ class EmailModel(BaseModel):
         return email
 
 
+class ForgotPasswordRequest(EmailModel):
+    pass
+
+
+class ResetPasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str
+    new_password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str
+    new_password: str
+
+
 class UserCreate(EmailModel):
     password: str
     role: UserRole = UserRole.user
