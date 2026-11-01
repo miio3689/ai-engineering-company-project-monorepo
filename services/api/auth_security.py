@@ -24,11 +24,15 @@ if ACCESS_TOKEN_EXPIRE_MINUTES < 1:
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-def create_access_token(user_uuid: int) -> str:
+def create_access_token(user: UserResponse) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
-    payload = {"user_uuid": user_uuid, "exp": expires_at}
+    payload = {
+        "user_uuid": user.id,
+        "user_created_at": user.created_at.isoformat(),
+        "exp": expires_at,
+    }
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
@@ -45,6 +49,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserResponse:
         raise unauthorized from exc
 
     user = services_auth.obtener_usuario_por_id(user_uuid)
-    if user is None or not user.is_active:
+    if (
+        user is None
+        or not user.is_active
+        or payload.get("user_created_at") != user.created_at.isoformat()
+    ):
         raise unauthorized
     return user

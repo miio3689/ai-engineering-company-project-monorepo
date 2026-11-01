@@ -24,6 +24,9 @@ missing, empty or shorter than 32 characters (excluding surrounding whitespace).
 There is no built-in signing key. The command above generates a random key;
 configure a stable secret through the deployment environment/secret manager
 and never commit it. Changing the key invalidates existing tokens.
+JWTs also bind to the account's stored `created_at`; a missing or mismatched
+claim is rejected, preventing a deleted account's token from authenticating
+as a new account if TinyDB reuses its ID.
 `ACCESS_TOKEN_EXPIRE_MINUTES` remains optional and defaults to 30.
 The service reads process environment variables, not environment files.
 

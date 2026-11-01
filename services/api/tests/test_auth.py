@@ -7,15 +7,18 @@ import sys
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr, redirect_stdout
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from jose import jwt
 from tinydb import TinyDB
 
 from services.api import promote_admin, services_auth
 from services.api.app import main
+from services.api.auth_security import JWT_ALGORITHM, JWT_SECRET_KEY
 from services.api.models import ProfileCreate, UserCreate, UserRole
 
 
@@ -237,6 +240,38 @@ class AuthEndpointsTests(unittest.TestCase):
         self.assertIsNone(services_auth.obtener_usuario_por_id(actor["id"]))
         self.assertIsNone(services_auth.obtener_perfil_por_user_id(actor["id"]))
         self.assertEqual(self.client.get("/auth/me", headers=headers).status_code, 401)
+
+    def test_jwt_is_invalidated_when_tinydb_reuses_a_deleted_user_id(self):
+        user_a = self.register("user-a@example.com")
+        token_a_headers = self.headers(user_a["email"])
+        deleted = self.client.delete(
+            f"/users/{user_a['id']}", headers=token_a_headers
+        )
+        self.assertEqual(deleted.status_code, 204)
+
+        user_b = self.register("user-b@example.com")
+        self.assertEqual(user_b["id"], user_a["id"])
+        self.assertEqual(
+            self.client.get("/auth/me", headers=token_a_headers).status_code, 401
+        )
+        token_b_headers = self.headers(user_b["email"])
+        response = self.client.get("/auth/me", headers=token_b_headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["email"], user_b["email"])
+
+        token_without_account_claim = jwt.encode(
+            {
+                "user_uuid": user_b["id"],
+                "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+            },
+            JWT_SECRET_KEY,
+            algorithm=JWT_ALGORITHM,
+        )
+        response = self.client.get(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {token_without_account_claim}"},
+        )
+        self.assertEqual(response.status_code, 401)
 
     def test_admin_can_delete_other_user_and_get_404_for_missing_user(self):
         admin = self.admin()
