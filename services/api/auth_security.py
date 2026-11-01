@@ -10,10 +10,12 @@ from jose import JWTError, jwt
 from . import services_auth
 from .models import UserResponse
 
-# These defaults are for local development only; production must set both env vars.
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or (
-    "dev-only-secret-change-before-deploying"
-)
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if JWT_SECRET_KEY is None or len(JWT_SECRET_KEY.strip()) < 32:
+    raise ValueError(
+        "JWT_SECRET_KEY is required and must contain at least 32 characters "
+        "(excluding surrounding whitespace)."
+    )
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES") or "30")
 if ACCESS_TOKEN_EXPIRE_MINUTES < 1:

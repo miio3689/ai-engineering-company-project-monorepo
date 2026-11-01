@@ -13,10 +13,7 @@ router = APIRouter(prefix="/profiles", tags=["profiles"])
 def get_my_profile(
     current_user: UserResponse = Depends(get_current_user),
 ) -> ProfileResponse:
-    profile = services_auth.obtener_perfil_por_user_id(current_user.id)
-    if profile is None:
-        raise HTTPException(status_code=404, detail="Perfil no encontrado.")
-    return profile
+    return services_auth.obtener_o_crear_perfil(current_user.id)
 
 
 @router.put("/me", response_model=ProfileResponse)
@@ -27,5 +24,4 @@ def update_my_profile(
     try:
         return services_auth.actualizar_perfil(current_user.id, data)
     except ValueError as exc:
-        status_code = 404 if "no tiene un perfil" in str(exc) else 422
-        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
