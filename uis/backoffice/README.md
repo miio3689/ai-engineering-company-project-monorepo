@@ -123,10 +123,13 @@ cd uis/backoffice
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npx next dev --hostname 0.0.0.0 --port 3000
 ```
 
-En Codespaces, usar como `NEXT_PUBLIC_API_BASE_URL` la URL HTTPS del puerto
-8000 reenviado, accesible desde el navegador. El origen del frontend debe estar
-permitido por CORS en la API. Esta variable se incorpora al código cliente al
-arrancar/compilar Next.js; reiniciar el frontend después de cambiarla.
+En Codespaces, configurar como Public tanto el puerto 3000 (frontend) como el
+8000 (API). Si alguno no es público, el navegador puede mostrar un error de
+CORS en las peticiones previas (preflight). `NEXT_PUBLIC_API_BASE_URL` debe
+apuntar a la URL pública HTTPS del puerto 8000. El origen del frontend debe
+estar permitido por CORS en la API. Esta variable se incorpora al código
+cliente al arrancar/compilar Next.js; reiniciar el frontend después de
+cambiarla.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

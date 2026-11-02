@@ -103,20 +103,30 @@ never through public registration.
 ## AUTH-03: password reset email configuration
 
 - `RESEND_API_KEY`: Resend API key; required to deliver password reset emails
-  and has no default. It is read only from the process environment or the
-  service's local environment file.
-- `EMAIL_FROM`: sender address for reset emails. Defaults to
-  `onboarding@resend.dev` for development.
-- `FRONTEND_BASE_URL`: frontend base URL used to construct the reset link. It
-  defaults to `http://localhost:3000`.
+  and has no default. It must be configured to send email through Resend.
+- `EMAIL_FROM`: sender address for reset emails; defaults to
+  `onboarding@resend.dev`.
+- `FRONTEND_BASE_URL`: public frontend base URL used to construct the reset
+  link, without a trailing slash. In Codespaces, use the public URL for port
+  3000. It defaults to `http://localhost:3000` for local development.
 - `PASSWORD_RESET_EXPIRE_MINUTES`: reset-token lifetime in minutes. Defaults to
   `30`; accepted values are from `15` to `60`.
-The email lookup is case-insensitive. A missing/invalid email fails with a
-nonzero exit code; repeated promotion is safe. This updates the existing
-`services/api/auth.json` store without changing the password or profile.
-Restrict terminal/database access to administrators. Stop the API while running
-this command: TinyDB requires a single writer, and the service's lock only
-coordinates threads within one process. Run the API with one worker.
+
+In Resend test mode, email is delivered only to the address of the Resend
+account owner.
+
+### Password reset endpoints
+
+| Endpoint | Authentication | Responses |
+| --- | --- | --- |
+| `POST /auth/forgot-password` | Public | `200` with the same generic response whether or not the email exists; request validation errors return `422`. |
+| `POST /auth/reset-password` | Public | `200` when the password is reset; `400` for an invalid, expired or already-used token; request validation errors return `422`. |
+| `POST /auth/change-password` | Con sesión autenticada | `200` when the password is changed; `400` when the current password is incorrect; `401` when unauthenticated; request validation errors return `422`. |
+
+`forgot-password` schedules email delivery and always returns `200`, including
+when the account does not exist or email delivery fails, so the endpoint does
+not disclose account existence or mail-provider status. Reset tokens are
+single-use; a successful reset invalidates the token.
 
 ### Verification
 
