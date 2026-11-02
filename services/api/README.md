@@ -73,8 +73,9 @@ Run the complete backend suite from the repository root:
 uv run python -m unittest discover -s services/api/tests -t . -v
 ```
 
-Tests define their own fake signing key only in test code and use temporary
-databases; they never read or write environment files or the real user store.
+Tests define their own fake signing key and use temporary databases. The JWT
+startup subprocess disables dotenv loading, so the missing-key case is isolated
+from `services/api/.env`; tests do not modify the real user store.
 Install the project's `test` dependency group if `httpx` is missing.
 The registration grep in the backoffice found no submitted `role`: its input
 contains email/password plus optional name/phone/address. No frontend was changed.
@@ -125,8 +126,9 @@ Run the complete backend suite from the repository root:
 uv run python -m unittest discover -s services/api/tests -t . -v
 ```
 
-Tests define their own fake signing key only in test code and use temporary
-databases; they never read or write environment files or the real user store.
+Tests define their own fake signing key and use temporary databases. The JWT
+startup subprocess disables dotenv loading, so the missing-key case is isolated
+from `services/api/.env`; tests do not modify the real user store.
 Install the project's `test` dependency group if `httpx` is missing.
 The registration grep in the backoffice found no submitted `role`: its input
 contains email/password plus optional name/phone/address. No frontend was changed.

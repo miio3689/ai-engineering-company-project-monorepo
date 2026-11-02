@@ -52,6 +52,16 @@ def _get_password_reset_tables() -> Iterator[tuple[Table, Table]]:
         yield database.table("users"), database.table("password_reset_tokens")
 
 
+@contextmanager
+def _get_user_deletion_tables() -> Iterator[tuple[Table, Table, Table]]:
+    with TinyDB(AUTH_DATABASE_PATH) as database:
+        yield (
+            database.table("users"),
+            database.table("profiles"),
+            database.table("password_reset_tokens"),
+        )
+
+
 def _find_user_by_email(table: Table, email: str) -> dict | None:
     normalized_email = email.casefold()
     return next(
@@ -136,6 +146,7 @@ def create_reset_token(email: str) -> str | None:
             {
                 "token_hash": token_hash,
                 "user_id": user.doc_id,
+                "user_created_at": user["created_at"],
                 "expires_at": expires_at.isoformat(),
                 "used_at": None,
             }
@@ -164,7 +175,13 @@ def reset_password(token: str, new_password: str) -> None:
             raise InvalidResetTokenError("El token de restablecimiento no es válido.")
 
         user_id = reset_record["user_id"]
-        if users.get(doc_id=user_id) is None:
+        user = users.get(doc_id=user_id)
+        if (
+            user is None
+            or not reset_record.get("user_created_at")
+            or not user.get("created_at")
+            or reset_record["user_created_at"] != user["created_at"]
+        ):
             raise InvalidResetTokenError("El token de restablecimiento no es válido.")
 
         users.update({"hashed_password": bcrypt.hash(new_password)}, doc_ids=[user_id])
@@ -237,9 +254,14 @@ def actualizar_usuario(user_id: int, data: UserUpdate) -> UserResponse:
 
 
 def eliminar_usuario(user_id: int) -> bool:
-    with _database_lock, _get_auth_tables() as (users, profiles):
+    with _database_lock, _get_user_deletion_tables() as (
+        users,
+        profiles,
+        reset_tokens,
+    ):
         record = users.get(doc_id=user_id)
         profiles.remove(lambda profile: profile["user_id"] == user_id)
+        reset_tokens.remove(lambda token: token["user_id"] == user_id)
         if record is None:
             return False
         users.remove(doc_ids=[user_id])

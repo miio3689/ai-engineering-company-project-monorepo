@@ -63,7 +63,46 @@ class PasswordServiceTests(unittest.TestCase):
         valid_token = services_auth.create_reset_token("reset-tests@example.com")
         changed_character = "A" if valid_token[-1] != "A" else "B"
         manipulated_token = valid_token[:-1] + changed_character
-        for token in ("unknown-token", manipulated_token):
+        token_without_timestamp = services_auth.create_reset_token(
+            "reset-tests@example.com"
+        )
+        with TinyDB(self.database_path) as database:
+            tokens = database.table("password_reset_tokens")
+            record = next(
+                item
+                for item in tokens.all()
+                if item["token_hash"]
+                == hashlib.sha256(token_without_timestamp.encode("utf-8")).hexdigest()
+            )
+            tokens.update(
+                lambda item: item.pop("user_created_at", None),
+                doc_ids=[record.doc_id],
+            )
+
+        token_with_mismatched_timestamp = services_auth.create_reset_token(
+            "reset-tests@example.com"
+        )
+        with TinyDB(self.database_path) as database:
+            tokens = database.table("password_reset_tokens")
+            record = next(
+                item
+                for item in tokens.all()
+                if item["token_hash"]
+                == hashlib.sha256(
+                    token_with_mismatched_timestamp.encode("utf-8")
+                ).hexdigest()
+            )
+            tokens.update(
+                {"user_created_at": "2000-01-01T00:00:00+00:00"},
+                doc_ids=[record.doc_id],
+            )
+
+        for token in (
+            "unknown-token",
+            manipulated_token,
+            token_without_timestamp,
+            token_with_mismatched_timestamp,
+        ):
             with self.subTest(token=token):
                 with self.assertRaises(services_auth.InvalidResetTokenError):
                     services_auth.reset_password(token, "new-password")
@@ -79,7 +118,8 @@ class PasswordServiceTests(unittest.TestCase):
             record["token_hash"], hashlib.sha256(token.encode("utf-8")).hexdigest()
         )
         self.assertEqual(
-            set(record), {"token_hash", "user_id", "expires_at", "used_at"}
+            set(record),
+            {"token_hash", "user_id", "user_created_at", "expires_at", "used_at"},
         )
         self.assertIsNone(record["used_at"])
 

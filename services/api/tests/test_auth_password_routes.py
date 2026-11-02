@@ -157,6 +157,29 @@ class PasswordRouteTests(unittest.TestCase):
                 )
                 self.assertEqual(response.status_code, 400)
 
+    def test_deleted_users_reset_token_cannot_target_reused_user_id(self):
+        token = services_auth.create_reset_token(self.email)
+        self.assertTrue(services_auth.eliminar_usuario(self.user_id))
+
+        replacement_email = "replacement-password-routes@example.com"
+        replacement_password = "replacement-password"
+        replacement = services_auth.crear_usuario(
+            UserCreate(email=replacement_email, password=replacement_password)
+        )
+        self.assertEqual(replacement.id, self.user_id)
+
+        response = self.client.post(
+            "/auth/reset-password",
+            json={"token": token, "new_password": "attacker-password"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIsNotNone(
+            services_auth.autenticar_usuario(replacement_email, replacement_password)
+        )
+        self.assertIsNone(
+            services_auth.autenticar_usuario(replacement_email, "attacker-password")
+        )
+
     def test_change_password_requires_session_and_verifies_current_password(self):
         payload = {
             "current_password": self.original_password,
