@@ -1,7 +1,9 @@
 fastapi>=0.115,<1.0
 uvicorn[standard]>=0.30,<1.0
 python-multipart>=0.0.9
+python-dotenv>=1.2.4,<2
 pydantic>=2,<3
 tinydb>=4.8,<5
 libpass[bcrypt]>=1.9.4
 python-jose[cryptography]>=3.5.0
+resend>=2.50.1,<3

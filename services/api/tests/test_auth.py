@@ -444,7 +444,12 @@ class JwtStartupTests(unittest.TestCase):
         if secret is not None:
             environment["JWT_SECRET_KEY"] = secret
         return subprocess.run(
-            [sys.executable, "-c", "import services.api.app.main"],
+            [
+                sys.executable,
+                "-c",
+                "import dotenv; dotenv.load_dotenv = lambda *args, **kwargs: False; "
+                "import services.api.app.main",
+            ],
             cwd=Path(__file__).resolve().parents[3],
             env=environment,
             capture_output=True,

@@ -1,5 +1,15 @@
 import { apiRequest } from "@/services/api-client";
-import type { AuthField, AuthFieldErrors, AuthToken, LoginInput, RegistrationInput } from "@/types/auth";
+import type {
+  AuthField,
+  AuthFieldErrors,
+  AuthToken,
+  ChangePasswordInput,
+  ForgotPasswordInput,
+  LoginInput,
+  MessageResponse,
+  RegistrationInput,
+  ResetPasswordInput,
+} from "@/types/auth";
 
 const fieldMessages: Record<AuthField, string> = {
   email: "Introduce un correo válido, por ejemplo nombre@empresa.com.",
@@ -25,7 +35,11 @@ async function readAuthJson(response: Response): Promise<unknown> {
   }
 }
 
-async function responseError(response: Response, registration: boolean): Promise<AuthError> {
+async function responseError(
+  response: Response,
+  registration: boolean,
+  action = registration ? "crear la cuenta" : "iniciar sesión",
+): Promise<AuthError> {
   if (registration && response.status === 409) {
     return new AuthError("", { email: "Ya existe una cuenta con este correo. Inicia sesión o usa otro." });
   }
@@ -60,7 +74,44 @@ async function responseError(response: Response, registration: boolean): Promise
       fields,
     );
   }
-  return new AuthError(`No se pudo ${registration ? "crear la cuenta" : "iniciar sesión"} (HTTP ${response.status}). Inténtalo de nuevo.`);
+  return new AuthError(`No se pudo ${action} (HTTP ${response.status}). Inténtalo de nuevo.`);
+}
+
+export async function forgotPassword(input: ForgotPasswordInput): Promise<void> {
+  const response = await apiRequest("/auth/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }, { authenticated: false });
+  if (!response.ok) {
+    throw new AuthError("No se pudo completar la solicitud. Inténtalo de nuevo.");
+  }
+}
+
+export async function resetPassword(input: ResetPasswordInput): Promise<MessageResponse> {
+  const response = await apiRequest("/auth/reset-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }, { authenticated: false });
+  if (response.status === 400) {
+    throw new AuthError("El enlace no es válido, ha caducado o ya se ha utilizado.");
+  }
+  if (!response.ok) throw await responseError(response, false, "restablecer la contraseña");
+  return (await readAuthJson(response)) as MessageResponse;
+}
+
+export async function changePassword(input: ChangePasswordInput): Promise<MessageResponse> {
+  const response = await apiRequest("/auth/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (response.status === 400) {
+    throw new AuthError("", { current_password: "La contraseña actual es incorrecta." });
+  }
+  if (!response.ok) throw await responseError(response, false, "cambiar la contraseña");
+  return (await readAuthJson(response)) as MessageResponse;
 }
 
 export async function login(input: LoginInput): Promise<AuthToken> {

@@ -7,6 +7,12 @@ import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { ACCESS_TOKEN_KEY } from "@/services/api-client";
 
 type SessionState = "checking" | "authenticated" | "anonymous" | "unavailable";
+const PUBLIC_ROUTES = new Set([
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+]);
 
 function getSessionSnapshot(): SessionState {
   try {
@@ -57,7 +63,7 @@ function ProtectedContent({ children }: { children: ReactNode }) {
 
 export default function AuthGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  if (pathname === "/login" || pathname === "/register") return children;
+  if (PUBLIC_ROUTES.has(pathname)) return children;
 
   return <ProtectedContent key={pathname}>{children}</ProtectedContent>;
 }

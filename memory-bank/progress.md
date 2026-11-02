@@ -176,6 +176,28 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
 - Used an isolated authentication test database, not the existing user store.
   No route guards, website/Data Lab changes, backend changes, or commit.
 
+## AUTH-03 - Restablecimiento y cambio de contraseña
+
+- Backend: restablecimiento por email con tokens aleatorios almacenados como
+  hash SHA-256, caducidad configurable, un solo uso e invalidación de tokens
+  previos. `POST /auth/forgot-password` siempre responde `200`; los endpoints
+  de reset y cambio de contraseña responden `400` ante token inválido/usado o
+  contraseña actual incorrecta, respectivamente.
+- Frontend: vistas `/forgot-password`, `/reset-password` y
+  `/account/change-password`; enlace de recuperación en login y rutas públicas
+  incluidas en el guard. Un `400` al cambiar la contraseña muestra el error y
+  conserva la sesión.
+- Validaciones reportadas: 41 pruebas de backend y 18 de frontend, build, lint
+  y typecheck superados.
+- La desarrolladora completó y verificó la prueba real de extremo a extremo
+  con Resend: email recibido con enlace correcto, cambio de contraseña,
+  rechazo al reutilizar el enlace y respuesta `400` al cambiar la contraseña
+  desde la cuenta sin cerrar la sesión.
+- Limitaciones conocidas: la API todavía devuelve `404` en `/records`, previo
+  a este trabajo; el token de reset viaja en la URL y puede quedar en el
+  historial del navegador; Resend en modo de pruebas solo entrega al email de
+  la cuenta propietaria.
+
 ## Milestone 09 - Supplier write actions
 
 - Added supplier creation with multiple categories, optional contact/notes,

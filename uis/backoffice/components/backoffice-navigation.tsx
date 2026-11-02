@@ -12,12 +12,13 @@ const links = [
   { href: "/incidents", label: "Incidencias" },
   { href: "/suppliers", label: "Proveedores" },
   { href: "/account/profile", label: "Mi perfil" },
+  { href: "/account/change-password", label: "Cambiar contraseña" },
 ];
 
 export default function BackofficeNavigation() {
   const pathname = usePathname();
   const [error, setError] = useState<string | null>(null);
-  if (pathname === "/login" || pathname === "/register") return null;
+  if (["/login", "/register", "/forgot-password", "/reset-password"].includes(pathname)) return null;
 
   function logout() {
     try {

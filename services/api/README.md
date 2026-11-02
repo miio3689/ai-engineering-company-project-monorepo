@@ -13,6 +13,11 @@ python3 -c 'import secrets; print(secrets.token_urlsafe(48))'
 uv run --env-file services/api/.env uvicorn services.api.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+At startup, the API loads `services/api/.env` before initializing authentication
+configuration. Existing process environment variables take precedence. Standalone
+scripts such as `promote_admin` do not start the API, so run them with `--env-file`
+as shown below.
+
 `POST /api/incidents/analyze` accepts a CSV upload under the multipart field `file`. `GET /api/incidents/results/export` downloads the most recent analysis as `results.csv`. The most recent metrics are held in process memory and are reset when the service restarts.
 
 Browser access is allowed from `http://localhost:3000` and the configured Codespaces backoffice origin by default. Set `CORS_ALLOWED_ORIGINS` to a comma-separated list of exact origins to override this default, for example `CORS_ALLOWED_ORIGINS="http://localhost:3000,https://backoffice.example.com"`.
@@ -28,7 +33,7 @@ JWTs also bind to the account's stored `created_at`; a missing or mismatched
 claim is rejected, preventing a deleted account's token from authenticating
 as a new account if TinyDB reuses its ID.
 `ACCESS_TOKEN_EXPIRE_MINUTES` remains optional and defaults to 30.
-The service reads process environment variables, not environment files.
+The service loads `services/api/.env` at startup; existing process environment variables take precedence.
 
 - Public `POST /users` accepts `email`, `password`, and optional `name`, `phone`
   and `address`. It always assigns `user`; any supplied `role` returns 422.
@@ -68,8 +73,72 @@ Run the complete backend suite from the repository root:
 uv run python -m unittest discover -s services/api/tests -t . -v
 ```
 
-Tests define their own fake signing key only in test code and use temporary
-databases; they never read or write environment files or the real user store.
+Tests define their own fake signing key and use temporary databases. The JWT
+startup subprocess disables dotenv loading, so the missing-key case is isolated
+from `services/api/.env`; tests do not modify the real user store.
+Install the project's `test` dependency group if `httpx` is missing.
+The registration grep in the backoffice found no submitted `role`: its input
+contains email/password plus optional name/phone/address. No frontend was changed.
+
+```bash
+grep -nE 'role|RegistrationInput|JSON.stringify|/users|input\[field\]|\["name", "phone", "address"\]' \
+  uis/backoffice/services/auth.ts uis/backoffice/types/auth.ts \
+  uis/backoffice/hooks/use-auth-form.ts
+```
+
+AUTH-01 regression coverage in `tests/test_auth.py`:
+
+| Failure | Rejected case | Allowed case |
+| --- | --- | --- |
+| 1 | `test_public_registration_rejects_every_role_and_assigns_user` | Same test: registration without role and successful login; terminal promotion tests |
+| 2 | `test_non_admin_cannot_submit_role_even_unchanged_or_invalid`, `test_non_admin_cannot_update_other_existing_or_missing_user` | Own email update in the first test; `test_admin_can_update_email_and_role_of_any_user` |
+| 3 | `test_delete_other_user_is_forbidden_before_existence_check` | `test_self_delete_removes_user_profile_and_invalidates_token`, `test_admin_can_delete_other_user_and_get_404_for_missing_user` |
+| 4 | `test_invalid_profile_updates_do_not_create_or_change_profiles` | `test_registration_always_creates_profile_with_default_or_given_name`, `test_get_profile_repairs_legacy_account_idempotently`, `test_put_profile_repairs_legacy_account_and_preserves_changes` and concurrent repair test |
+| 5 | `test_startup_rejects_missing_empty_and_short_jwt_secret` | `test_startup_accepts_jwt_secret_at_minimum_length_and_above` plus real signed login tokens in endpoint tests |
+
+The original eight supplier/incident regression tests and their assertions
+remain unchanged. Admin fixtures are created through `services_auth.crear_usuario`,
+never through public registration.
+
+## AUTH-03: password reset email configuration
+
+- `RESEND_API_KEY`: Resend API key; required to deliver password reset emails
+  and has no default. It must be configured to send email through Resend.
+- `EMAIL_FROM`: sender address for reset emails; defaults to
+  `onboarding@resend.dev`.
+- `FRONTEND_BASE_URL`: public frontend base URL used to construct the reset
+  link, without a trailing slash. In Codespaces, use the public URL for port
+  3000. It defaults to `http://localhost:3000` for local development.
+- `PASSWORD_RESET_EXPIRE_MINUTES`: reset-token lifetime in minutes. Defaults to
+  `30`; accepted values are from `15` to `60`.
+
+In Resend test mode, email is delivered only to the address of the Resend
+account owner.
+
+### Password reset endpoints
+
+| Endpoint | Authentication | Responses |
+| --- | --- | --- |
+| `POST /auth/forgot-password` | Public | `200` with the same generic response whether or not the email exists; request validation errors return `422`. |
+| `POST /auth/reset-password` | Public | `200` when the password is reset; `400` for an invalid, expired or already-used token; request validation errors return `422`. |
+| `POST /auth/change-password` | Con sesión autenticada | `200` when the password is changed; `400` when the current password is incorrect; `401` when unauthenticated; request validation errors return `422`. |
+
+`forgot-password` schedules email delivery and always returns `200`, including
+when the account does not exist or email delivery fails, so the endpoint does
+not disclose account existence or mail-provider status. Reset tokens are
+single-use; a successful reset invalidates the token.
+
+### Verification
+
+Run the complete backend suite from the repository root:
+
+```bash
+uv run python -m unittest discover -s services/api/tests -t . -v
+```
+
+Tests define their own fake signing key and use temporary databases. The JWT
+startup subprocess disables dotenv loading, so the missing-key case is isolated
+from `services/api/.env`; tests do not modify the real user store.
 Install the project's `test` dependency group if `httpx` is missing.
 The registration grep in the backoffice found no submitted `role`: its input
 contains email/password plus optional name/phone/address. No frontend was changed.
