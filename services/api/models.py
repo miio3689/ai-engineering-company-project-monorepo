@@ -9,6 +9,17 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .shared_paths import ensure_shared_python_path
+
+ensure_shared_python_path()
+
+from brasaland_shared.incidents import (  # noqa: E402
+    Branch,
+    Category,
+    IncidentOrigin,
+    IncidentStatus,
+)
+
 
 class SupplierStatus(str, Enum):
     active = "active"
@@ -69,6 +80,44 @@ class SupplierStatusUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: SupplierStatus
+
+
+class IncidentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    description: str
+    category: Category
+    status: IncidentStatus
+    origin: IncidentOrigin
+    branch: Branch
+
+    @field_validator("title", "description")
+    @classmethod
+    def require_nonblank_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Este campo es obligatorio.")
+        return value
+
+
+class Incident(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    title: str
+    description: str
+    category: Category
+    status: IncidentStatus
+    origin: IncidentOrigin
+    branch: Branch
+    created_at: datetime
+    updated_at: datetime
+
+
+class IncidentStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: IncidentStatus
 
 
 class UserRole(str, Enum):
