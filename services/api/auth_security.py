@@ -10,10 +10,12 @@ from jose import JWTError, jwt
 from . import services_auth
 from .models import UserResponse
 
-# These defaults are for local development only; production must set both env vars.
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or (
-    "dev-only-secret-change-before-deploying"
-)
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if JWT_SECRET_KEY is None or len(JWT_SECRET_KEY.strip()) < 32:
+    raise ValueError(
+        "JWT_SECRET_KEY is required and must contain at least 32 characters "
+        "(excluding surrounding whitespace)."
+    )
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES") or "30")
 if ACCESS_TOKEN_EXPIRE_MINUTES < 1:
@@ -22,11 +24,15 @@ if ACCESS_TOKEN_EXPIRE_MINUTES < 1:
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-def create_access_token(user_uuid: int) -> str:
+def create_access_token(user: UserResponse) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
-    payload = {"user_uuid": user_uuid, "exp": expires_at}
+    payload = {
+        "user_uuid": user.id,
+        "user_created_at": user.created_at.isoformat(),
+        "exp": expires_at,
+    }
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
@@ -43,6 +49,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserResponse:
         raise unauthorized from exc
 
     user = services_auth.obtener_usuario_por_id(user_uuid)
-    if user is None or not user.is_active:
+    if (
+        user is None
+        or not user.is_active
+        or payload.get("user_created_at") != user.created_at.isoformat()
+    ):
         raise unauthorized
     return user
