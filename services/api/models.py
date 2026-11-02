@@ -128,16 +128,11 @@ class UserCreate(EmailModel):
     role: UserRole = UserRole.user
 
 
-class UserRegistration(UserCreate):
+class UserRegistration(EmailModel):
+    password: str
     name: str | None = None
     phone: str | None = None
     address: str | None = None
-
-    @model_validator(mode="after")
-    def validate_profile_fields(self) -> UserRegistration:
-        if self.name is None and (self.phone is not None or self.address is not None):
-            raise ValueError("name es obligatorio cuando se indican datos de perfil.")
-        return self
 
 
 class UserUpdate(BaseModel):

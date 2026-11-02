@@ -264,6 +264,19 @@ def obtener_perfil_por_user_id(user_id: int) -> ProfileResponse | None:
         return None if record is None else _profile_response(record)
 
 
+def obtener_o_crear_perfil(user_id: int) -> ProfileResponse:
+    with _database_lock:
+        profile = obtener_perfil_por_user_id(user_id)
+        if profile is not None:
+            return profile
+        user = obtener_usuario_por_id(user_id)
+        if user is None:
+            raise ValueError(f"No existe un usuario con id {user_id}.")
+        return crear_perfil(
+            user_id, ProfileCreate(name=user.email.partition("@")[0])
+        )
+
+
 def actualizar_perfil(user_id: int, data: ProfileUpdate) -> ProfileResponse:
     changes = data.model_dump(mode="json", exclude_unset=True)
     if not changes:
@@ -271,9 +284,8 @@ def actualizar_perfil(user_id: int, data: ProfileUpdate) -> ProfileResponse:
     if "name" in changes and changes["name"] is None:
         raise ValueError("name no puede ser null.")
 
-    with _database_lock, _get_auth_tables() as (_, profiles):
-        record = _find_profile_by_user_id(profiles, user_id)
-        if record is None:
-            raise ValueError(f"El usuario {user_id} no tiene un perfil.")
-        profiles.update(changes, doc_ids=[record.doc_id])
-        return _profile_response(dict(record) | changes, record.doc_id)
+    with _database_lock:
+        profile = obtener_o_crear_perfil(user_id)
+        with _get_auth_tables() as (_, profiles):
+            profiles.update(changes, doc_ids=[profile.id])
+        return ProfileResponse.model_validate(profile.model_dump() | changes)

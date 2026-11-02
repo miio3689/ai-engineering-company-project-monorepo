@@ -1,23 +1,16 @@
 import type { Supplier, SupplierFilters, SupplierInput, SupplierStatus } from "@/types/supplier";
-
-function getApiBaseUrl(): string {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!baseUrl) throw new Error("Falta NEXT_PUBLIC_API_BASE_URL en el entorno.");
-  return baseUrl.replace(/\/$/, "");
-}
+import { apiRequest } from "@/services/api-client";
 
 export async function fetchSuppliers(
   filters: SupplierFilters = {},
   signal?: AbortSignal,
 ): Promise<Supplier[]> {
-  const baseUrl = getApiBaseUrl();
-
   const params = new URLSearchParams();
   if (filters.country) params.set("country", filters.country);
   if (filters.category) params.set("category", filters.category);
   const query = params.toString();
-  const response = await fetch(
-    `${baseUrl.replace(/\/$/, "")}/suppliers${query ? `?${query}` : ""}`,
+  const response = await apiRequest(
+    `/suppliers${query ? `?${query}` : ""}`,
     { cache: "no-store", signal },
   );
 
@@ -60,7 +53,7 @@ function validationMessage(detail: unknown): string {
 }
 
 async function writeSupplier(path: string, method: "POST" | "PATCH", body: object): Promise<Supplier> {
-  const response = await fetch(`${getApiBaseUrl()}/suppliers${path}`, {
+  const response = await apiRequest(`/suppliers${path}`, {
     method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

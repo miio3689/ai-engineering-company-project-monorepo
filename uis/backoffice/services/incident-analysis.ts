@@ -1,14 +1,5 @@
 import type { IncidentAnalysisResponse } from "@/types/incident-analysis";
-
-function getApiBaseUrl(): string {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-  if (!baseUrl) {
-    throw new Error("Falta NEXT_PUBLIC_API_BASE_URL en el entorno.");
-  }
-
-  return baseUrl.replace(/\/$/, "");
-}
+import { apiRequest } from "@/services/api-client";
 
 async function getApiError(response: Response): Promise<string> {
   const fallback = `No se pudo completar la solicitud (HTTP ${response.status}).`;
@@ -32,7 +23,7 @@ export async function analyzeIncidentCsv(file: File): Promise<IncidentAnalysisRe
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${getApiBaseUrl()}/api/incidents/analyze`, {
+  const response = await apiRequest("/api/incidents/analyze", {
     method: "POST",
     body: formData,
     cache: "no-store",
@@ -46,7 +37,7 @@ export async function analyzeIncidentCsv(file: File): Promise<IncidentAnalysisRe
 }
 
 export async function downloadIncidentAnalysisCsv(): Promise<void> {
-  const response = await fetch(`${getApiBaseUrl()}/api/incidents/results/export`, {
+  const response = await apiRequest("/api/incidents/results/export", {
     method: "GET",
     cache: "no-store",
   });

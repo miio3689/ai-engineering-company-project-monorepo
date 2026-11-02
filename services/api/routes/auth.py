@@ -54,7 +54,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()) -> dict[str, str]:
             headers={"WWW-Authenticate": "Bearer"},
         )
     return {
-        "access_token": create_access_token(user.id),
+        "access_token": create_access_token(user),
         "token_type": "bearer",
     }
 

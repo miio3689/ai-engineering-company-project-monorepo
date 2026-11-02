@@ -1,11 +1,14 @@
 """User registration and protected user management endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from json import JSONDecodeError
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from .. import services_auth
 from ..auth_security import get_current_user
 from ..models import (
     ProfileCreate,
+    UserCreate,
     UserRegistration,
     UserResponse,
     UserRole,
@@ -17,20 +20,23 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(data: UserRegistration) -> UserResponse:
+    profile = ProfileCreate(
+        name=(data.name or "").strip() or data.email.partition("@")[0],
+        phone=data.phone,
+        address=data.address,
+    )
     try:
-        user = services_auth.crear_usuario(data)
+        user = services_auth.crear_usuario(
+            UserCreate(email=data.email, password=data.password, role=UserRole.user)
+        )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    if data.name is not None:
-        try:
-            services_auth.crear_perfil(
-                user.id,
-                ProfileCreate(name=data.name, phone=data.phone, address=data.address),
-            )
-        except Exception:
-            services_auth.eliminar_usuario(user.id)
-            raise
+    try:
+        services_auth.crear_perfil(user.id, profile)
+    except (ValueError, OSError):
+        services_auth.eliminar_usuario(user.id)
+        raise
     return user
 
 
@@ -52,17 +58,38 @@ def get_user(
     return user
 
 
-@router.put("/{user_id}", response_model=UserResponse)
-def update_user(
+async def authorize_user_update(
     user_id: int,
-    data: UserUpdate,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
-) -> UserResponse:
-    if current_user.role != UserRole.admin and current_user.id != user_id:
+) -> None:
+    if current_user.role == UserRole.admin:
+        return
+    if current_user.id != user_id:
         raise HTTPException(
             status_code=403,
             detail="No autorizado para modificar este usuario.",
         )
+    try:
+        data = await request.json()
+    except JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=422, detail="El cuerpo debe contener JSON válido."
+        ) from exc
+    # Check field presence before validation, including null or invalid role values.
+    if isinstance(data, dict) and "role" in data:
+        raise HTTPException(
+            status_code=403,
+            detail="No autorizado para modificar este usuario.",
+        )
+
+
+@router.put("/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: int,
+    data: UserUpdate,
+    _: None = Depends(authorize_user_update),
+) -> UserResponse:
     if not data.model_fields_set:
         raise HTTPException(status_code=422, detail="Debe indicar email o role.")
     if services_auth.obtener_usuario_por_id(user_id) is None:
@@ -76,7 +103,12 @@ def update_user(
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     user_id: int,
-    _: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> None:
+    if current_user.role != UserRole.admin and current_user.id != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="No autorizado para eliminar este usuario.",
+        )
     if not services_auth.eliminar_usuario(user_id):
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
