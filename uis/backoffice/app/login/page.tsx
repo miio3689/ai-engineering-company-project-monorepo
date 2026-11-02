@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   description: "Acceso al backoffice de Brasaland.",
 };
 
-export default function LoginPage() {
-  return <AuthForm mode="login" />;
+interface LoginPageProps {
+  searchParams: Promise<{ reset?: string | string[] }>;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { reset } = await searchParams;
+  return <AuthForm mode="login" resetSuccess={reset === "success"} />;
 }

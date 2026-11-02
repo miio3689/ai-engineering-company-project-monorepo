@@ -23,7 +23,7 @@ registerHooks({
 });
 
 const { ACCESS_TOKEN_KEY, apiRequest } = await import("../services/api-client.ts");
-const { AuthError, login, register } = await import("../services/auth.ts");
+const { AuthError, changePassword, forgotPassword, login, register, resetPassword } = await import("../services/auth.ts");
 const { validateAuthForm } = await import("../lib/auth-form-validation.ts");
 const { fetchSuppliers, createSupplier, updateSupplierRate, updateSupplierStatus } = await import("../services/suppliers.ts");
 const { analyzeIncidentCsv, downloadIncidentAnalysisCsv } = await import("../services/incident-analysis.ts");
@@ -97,6 +97,50 @@ test("public login 401 stays on the form, keeps existing storage, and is readabl
   respond({ detail: "Credenciales inválidas." }, 401);
   await assert.rejects(login({ email: "test@example.com", password: "wrong" }), /correo o la contraseña no son correctos/);
   assert.equal(storage.get(ACCESS_TOKEN_KEY), "first-token");
+  assert.deepEqual(redirects, []);
+});
+
+test("forgot and reset password services send public JSON to their endpoints", async () => {
+  browser("existing-session");
+  const resetInput = { token: globalThis.crypto.randomUUID(), new_password: "new-password" };
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return Response.json({ message: "ok" });
+  };
+
+  await forgotPassword({ email: "test@example.com" });
+  await resetPassword(resetInput);
+
+  assert.equal(calls[0].url, "http://api.test/auth/forgot-password");
+  assert.equal(calls[0].options.headers.has("Authorization"), false);
+  assert.deepEqual(JSON.parse(calls[0].options.body), { email: "test@example.com" });
+  assert.equal(calls[1].url, "http://api.test/auth/reset-password");
+  assert.equal(calls[1].options.headers.has("Authorization"), false);
+  assert.deepEqual(JSON.parse(calls[1].options.body), resetInput);
+});
+
+test("reset 400 is clear and never echoes the submitted token", async () => {
+  browser();
+  respond({ detail: "invalid" }, 400);
+  const input = { token: globalThis.crypto.randomUUID(), new_password: "new-password" };
+  await assert.rejects(
+    resetPassword(input),
+    (error) => error instanceof AuthError
+      && error.message === "El enlace no es válido, ha caducado o ya se ha utilizado."
+      && !error.message.includes(input.token),
+  );
+});
+
+test("change-password 400 is a field error and does not clear the session", async () => {
+  const { storage, redirects } = browser("active-session");
+  respond({ detail: "incorrect" }, 400);
+  await assert.rejects(
+    changePassword({ current_password: "wrong", new_password: "new-password" }),
+    (error) => error instanceof AuthError
+      && error.fields.current_password === "La contraseña actual es incorrecta.",
+  );
+  assert.equal(storage.get(ACCESS_TOKEN_KEY), "active-session");
   assert.deepEqual(redirects, []);
 });
 

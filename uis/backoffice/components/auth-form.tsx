@@ -7,7 +7,7 @@ import type { AuthField, AuthMode } from "@/types/auth";
 
 const fieldClass = "min-h-11 w-full rounded-lg border bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700";
 
-export default function AuthForm({ mode }: { mode: AuthMode }) {
+export default function AuthForm({ mode, resetSuccess = false }: { mode: AuthMode; resetSuccess?: boolean }) {
   const { busy, errors, error, submit, reset, formRef } = useAuthForm(mode);
   const registration = mode === "register";
   const fields: { name: AuthField; label: string; type: string; autoComplete: string; required?: boolean }[] = [
@@ -27,6 +27,7 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
         <h1 className="text-2xl font-bold" itemProp="name">{registration ? "Crear cuenta" : "Iniciar sesión"}</h1>
         <p>{registration ? "Regístrate para acceder al equipo de Brasaland." : "Accede con tu correo y contraseña."}</p>
       </header>
+      {resetSuccess && !registration && <p role="status" className="mb-4 rounded-lg bg-green-50 p-3 text-gray-800">Contraseña restablecida. Ya puedes iniciar sesión.</p>}
       <form ref={formRef} noValidate onSubmit={submit} onReset={reset} aria-busy={busy}>
         <fieldset disabled={busy} className="grid gap-4 disabled:opacity-70">
           <legend className="sr-only">{registration ? "Datos de registro" : "Credenciales de acceso"}</legend>
@@ -61,9 +62,12 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
         {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-red-900">{error}</p>}
       </form>
       <nav className="mt-6" aria-label="Acceso al backoffice">
-        <Link href={registration ? "/login" : "/register"} className="rounded underline focus-visible:outline-2 focus-visible:outline-offset-4">
-          {registration ? "¿Ya tienes cuenta? Iniciar sesión" : "¿No tienes cuenta? Crear cuenta"}
-        </Link>
+        <div className="grid justify-items-start gap-3">
+          <Link href={registration ? "/login" : "/register"} className="rounded underline focus-visible:outline-2 focus-visible:outline-offset-4">
+            {registration ? "¿Ya tienes cuenta? Iniciar sesión" : "¿No tienes cuenta? Crear cuenta"}
+          </Link>
+          {!registration && <Link href="/forgot-password" className="rounded underline focus-visible:outline-2 focus-visible:outline-offset-4">¿Olvidaste tu contraseña?</Link>}
+        </div>
       </nav>
     </main>
   );
