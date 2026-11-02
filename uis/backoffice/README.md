@@ -131,6 +131,19 @@ estar permitido por CORS en la API. Esta variable se incorpora al código
 cliente al arrancar/compilar Next.js; reiniciar el frontend después de
 cambiarla.
 
+## Gestor de incidencias
+
+La ruta existente `/incidents` sigue siendo el analizador CSV. El gestor nuevo
+añade estas rutas protegidas, con navegación entre ellas:
+
+- `/incidents/register`: registra incidencias con los campos del modelo y
+  validación en cliente.
+- `/incidents/list`: muestra y filtra incidencias por estado, origen y sede;
+  permite avanzar el estado mediante las transiciones válidas. Incluye un
+  panel de resumen.
+- `/incidents/summary`: muestra los totales generales y los desgloses por
+  estado, categoría, origen y sede.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

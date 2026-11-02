@@ -198,6 +198,35 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   historial del navegador; Resend en modo de pruebas solo entrega al email de
   la cuenta propietaria.
 
+## Gestor de Incidencias Centralizado
+
+- Modelo `Incident` con ID, campos de incidencia y timestamps automáticos.
+  Cinco endpoints autenticados: `POST /api/incidents`, `GET /api/incidents`,
+  `GET /api/incidents/summary`, `GET /api/incidents/{id}` y
+  `PATCH /api/incidents/{id}/status`. La
+  conversión de validación a `400` está acotada al router de incidencias;
+  login y registro mantienen sus respuestas `422`.
+- `packages/shared/python/brasaland_shared` contiene la validación compartida
+  y las reglas de transformación. `scripts/analyze.py` conserva su interfaz
+  pública como fachada compatible.
+- `scripts/seed_incidents.py` carga el CSV en TinyDB e implementa idempotencia
+  con `incident_id` en una tabla auxiliar, sin añadir esa clave al modelo.
+- El seed fue verificado por la desarrolladora con el CSV real: 96 registros
+  (open 32, resolved 50, discarded 14; customer_complaint 48, supply_issue 22,
+  equipment_failure 17, staff_issue 9). La segunda ejecución no duplicó
+  registros.
+- Backoffice: formulario en `/incidents/register`, listado y cambio de estado
+  en `/incidents/list`, y métricas en `/incidents/summary`. La desarrolladora
+  verificó manualmente el frontend en el navegador de Codespaces; en esta
+  sesión no fue posible ejecutar Chromium.
+- Validaciones registradas: 70 pruebas de backend en total (41 previas más las
+  nuevas), 18 pruebas de `test:auth`, typecheck, lint sin avisos y build.
+- Limitaciones conocidas: la página `/` sigue recibiendo el `404` preexistente
+  de `/records`; TinyDB no coordina escrituras entre procesos, por lo que el
+  seed debe ejecutarse con la API parada y la API debe usar un solo worker. La
+  alerta para quejas abiertas durante más de 48 horas no está implementada;
+  solo se dejó el modelo preparado.
+
 ## Milestone 09 - Supplier write actions
 
 - Added supplier creation with multiple categories, optional contact/notes,
