@@ -26,4 +26,4 @@ test = ["httpx>=0.28,<1.0"]
 seed = "services.api.seed:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["services"]
+packages = ["services", "packages/shared/python/brasaland_shared"]
