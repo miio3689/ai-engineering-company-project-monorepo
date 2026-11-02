@@ -7,10 +7,25 @@ import argparse
 import csv
 from collections import Counter
 from pathlib import Path
+import sys
 from typing import Any, Mapping, Sequence
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
-Record = Mapping[str, Any]
+from services.api.shared_paths import ensure_shared_python_path  # noqa: E402
+
+ensure_shared_python_path(REPOSITORY_ROOT)
+
+from brasaland_shared.incidents import (  # noqa: E402
+    CSV_CATEGORIES,
+    CSV_STATUSES,
+    SATISFACTION_SCORES,
+    VALIDATION_ERROR_NAMES,
+    Record,
+    validate_record,
+)
 
 
 def read_records(csv_path: str | Path) -> list[dict[str, str]]:
@@ -19,81 +34,8 @@ def read_records(csv_path: str | Path) -> list[dict[str, str]]:
         return [dict(row) for row in csv.DictReader(csv_file)]
 
 
-def validate_record(record: Record) -> tuple[bool, list[str]]:
-    """Return whether one record is valid and the IDs of any failed rules.
-
-    This function has no I/O and does not rely on module-level business data,
-    so it can be imported and reused independently.
-    """
-    allowed_locations = {
-        *(f"COL-{number:02d}" for number in range(1, 11)),
-        *(f"FLA-{number:02d}" for number in range(1, 5)),
-    }
-    allowed_categories = {
-        "CUSTOMER_COMPLAINT",
-        "EQUIPMENT",
-        "SUPPLY",
-        "FOOD_QUALITY",
-        "STAFF",
-    }
-
-    def value(field: str) -> str:
-        raw = record.get(field, "")
-        return "" if raw is None else str(raw).strip()
-
-    failures: list[str] = []
-
-    location_id = value("location_id")
-    if not location_id or location_id not in allowed_locations:
-        failures.append("missing_or_invalid_location_id")
-
-    category = value("category")
-    if not category or category not in allowed_categories:
-        failures.append("missing_or_invalid_category")
-
-    description = value("description")
-    if len(description) < 5:
-        failures.append("empty_or_short_description")
-
-    if not value("reporter_id"):
-        failures.append("missing_reporter_id")
-
-    status = value("status")
-    score_text = value("satisfaction_score")
-    if status == "CLOSED" and not score_text:
-        failures.append("closed_without_satisfaction_score")
-
-    if score_text:
-        try:
-            score = int(score_text)
-        except ValueError:
-            score = None
-        if score is None or str(score) != score_text or not 1 <= score <= 5:
-            failures.append("satisfaction_score_out_of_range")
-
-    return not failures, failures
-
-
 def calculate_metrics(records: Sequence[Record]) -> dict[str, Any]:
     """Calculate incident metrics without I/O; only valid rows feed breakdowns."""
-    categories = (
-        "CUSTOMER_COMPLAINT",
-        "EQUIPMENT",
-        "SUPPLY",
-        "FOOD_QUALITY",
-        "STAFF",
-    )
-    statuses = ("OPEN", "CLOSED", "DISCARDED")
-    score_values = (1, 2, 3, 4, 5)
-    error_names = (
-        "missing_or_invalid_location_id",
-        "missing_or_invalid_category",
-        "empty_or_short_description",
-        "missing_reporter_id",
-        "closed_without_satisfaction_score",
-        "satisfaction_score_out_of_range",
-    )
-
     valid_records: list[Record] = []
     invalid_by_rule: Counter[str] = Counter()
     for record in records:
@@ -123,23 +65,25 @@ def calculate_metrics(records: Sequence[Record]) -> dict[str, Any]:
         "total_records": total,
         "valid_records": valid_total,
         "invalid_records": total - valid_total,
-        "invalid_by_rule": {name: invalid_by_rule[name] for name in error_names},
-        "category_counts": {name: category_counts[name] for name in categories},
+        "invalid_by_rule": {name: invalid_by_rule[name] for name in VALIDATION_ERROR_NAMES},
+        "category_counts": {name: category_counts[name] for name in CSV_CATEGORIES},
         "category_percentages": {
             name: (category_counts[name] / valid_total * 100 if valid_total else 0.0)
-            for name in categories
+            for name in CSV_CATEGORIES
         },
-        "status_counts": {name: status_counts[name] for name in statuses},
+        "status_counts": {name: status_counts[name] for name in CSV_STATUSES},
         "status_percentages": {
             name: (status_counts[name] / valid_total * 100 if valid_total else 0.0)
-            for name in statuses
+            for name in CSV_STATUSES
         },
         "closed_records": closed_total,
         "scored_closed_cases": len(scored_closed_cases),
         "average_satisfaction": (
             sum(scored_closed_cases) / len(scored_closed_cases) if scored_closed_cases else None
         ),
-        "satisfaction_counts": {score: score_counts[score] for score in score_values},
+        "satisfaction_counts": {
+            score: score_counts[score] for score in SATISFACTION_SCORES
+        },
     }
 
 

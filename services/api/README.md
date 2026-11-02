@@ -20,6 +20,49 @@ as shown below.
 
 `POST /api/incidents/analyze` accepts a CSV upload under the multipart field `file`. `GET /api/incidents/results/export` downloads the most recent analysis as `results.csv`. The most recent metrics are held in process memory and are reset when the service restarts.
 
+## Gestión de incidencias
+
+Los cinco endpoints de gestión y resumen requieren autenticación Bearer. La
+validación de estas rutas devuelve `400` con este formato, identificando cada
+campo y explicando el error en español:
+
+```json
+{
+  "detail": "Datos no válidos.",
+  "errors": [
+    { "field": "status", "message": "Selecciona uno de los valores permitidos." }
+  ]
+}
+```
+
+| Endpoint | Respuestas |
+| --- | --- |
+| `POST /api/incidents` | `201` creada; `400` datos no válidos; `401` sin autenticación; `500` error interno genérico. |
+| `GET /api/incidents` | `200` lista (vacía si no hay incidencias); `400` filtros no válidos; `401` sin autenticación; `500` error interno genérico. Filtros opcionales combinables: `status`, `origin`, `branch` y `category`. |
+| `GET /api/incidents/summary` | `200` resumen; `401` sin autenticación; `500` error interno genérico. |
+| `GET /api/incidents/{id}` | `200` incidencia; `401` sin autenticación; `404` si no existe; `500` error interno genérico. |
+| `PATCH /api/incidents/{id}/status` | `200` incidencia actualizada; `400` datos o transición no válidos; `401` sin autenticación; `404` si no existe; `500` error interno genérico. |
+
+El resumen tiene esta forma; cada desglose contiene todos los valores permitidos
+de su grupo, incluso cuando su contador es cero:
+
+```text
+{
+  "total": entero,
+  "by_status": { "open": entero, "in_progress": entero, "resolved": entero, "discarded": entero },
+  "by_category": { ... },
+  "by_origin": { ... },
+  "by_branch": { ... }
+}
+```
+
+Con la base vacía, `total` y todos los contadores son cero. El almacenamiento
+TinyDB de incidencias está en `services/api/incidents.json`, separado de los
+almacenes de proveedores y autenticación, y excluido de Git. Los errores
+inesperados responden con un mensaje genérico sin exponer el stack trace. La
+conversión de errores de validación de FastAPI a `400` se limita al router de
+incidencias; login y registro conservan sus respuestas `422`.
+
 Browser access is allowed from `http://localhost:3000` and the configured Codespaces backoffice origin by default. Set `CORS_ALLOWED_ORIGINS` to a comma-separated list of exact origins to override this default, for example `CORS_ALLOWED_ORIGINS="http://localhost:3000,https://backoffice.example.com"`.
 
 ## AUTH-01: configuration and authorization
@@ -85,6 +128,31 @@ grep -nE 'role|RegistrationInput|JSON.stringify|/users|input\[field\]|\["name", 
   uis/backoffice/services/auth.ts uis/backoffice/types/auth.ts \
   uis/backoffice/hooks/use-auth-form.ts
 ```
+
+## Seed del gestor de incidencias
+
+Desde la raíz del monorepo, importa el CSV histórico por defecto:
+
+```bash
+uv run python scripts/seed_incidents.py
+```
+
+También se puede indicar otra ruta:
+
+```bash
+uv run python scripts/seed_incidents.py ruta/al/archivo.csv
+```
+
+El seed valida las filas con la lógica compartida, transforma estados,
+categorías y sedes, y reporta descartes sin imprimir la descripción. La clave
+de origen se guarda en la tabla auxiliar `incident_seed_keys`, no en el
+documento `Incident`; volver a ejecutar el seed omite las claves ya
+registradas.
+
+TinyDB no coordina escrituras entre procesos: **detén la API antes de ejecutar
+el seed y configura la API con un solo worker**. El incidente se inserta antes
+que su clave de idempotencia. Si el proceso se interrumpe entre ambas
+escrituras, una segunda ejecución podría insertar de nuevo esa incidencia.
 
 AUTH-01 regression coverage in `tests/test_auth.py`:
 
