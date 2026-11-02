@@ -10,6 +10,7 @@ const linkClass = "flex min-h-11 items-center rounded px-2 underline focus-visib
 const links = [
   { href: "/", label: "Candidaturas" },
   { href: "/incidents", label: "Incidencias" },
+  { href: "/incidents/list", label: "Gestor de incidencias" },
   { href: "/suppliers", label: "Proveedores" },
   { href: "/account/profile", label: "Mi perfil" },
   { href: "/account/change-password", label: "Cambiar contraseña" },
