@@ -86,6 +86,31 @@ grep -nE 'role|RegistrationInput|JSON.stringify|/users|input\[field\]|\["name", 
   uis/backoffice/hooks/use-auth-form.ts
 ```
 
+## Seed del gestor de incidencias
+
+Desde la raíz del monorepo, importa el CSV histórico por defecto:
+
+```bash
+uv run python scripts/seed_incidents.py
+```
+
+También se puede indicar otra ruta:
+
+```bash
+uv run python scripts/seed_incidents.py ruta/al/archivo.csv
+```
+
+El seed valida las filas con la lógica compartida, transforma estados,
+categorías y sedes, y reporta descartes sin imprimir la descripción. La clave
+de origen se guarda en la tabla auxiliar `incident_seed_keys`, no en el
+documento `Incident`; volver a ejecutar el seed omite las claves ya
+registradas.
+
+TinyDB no coordina escrituras entre procesos: **detén la API antes de ejecutar
+el seed y configura la API con un solo worker**. El incidente se inserta antes
+que su clave de idempotencia. Si el proceso se interrumpe entre ambas
+escrituras, una segunda ejecución podría insertar de nuevo esa incidencia.
+
 AUTH-01 regression coverage in `tests/test_auth.py`:
 
 | Failure | Rejected case | Allowed case |
