@@ -112,8 +112,11 @@ class IncidentRoute(APIRoute):
                 )
             except StarletteHTTPException:
                 raise
-            except Exception:
-                logger.exception("Unexpected error in an incident endpoint")
+            except Exception as exc:
+                logger.error(
+                    "Unexpected error in an incident endpoint (type: %s).",
+                    type(exc).__name__,
+                )
                 return JSONResponse(
                     status_code=500,
                     content={"detail": "Error interno del servicio."},

@@ -1,5 +1,6 @@
 """User registration and protected user management endpoints."""
 
+import logging
 from json import JSONDecodeError
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -16,6 +17,7 @@ from ..models import (
 )
 
 router = APIRouter(prefix="/users", tags=["users"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -30,13 +32,29 @@ def register_user(data: UserRegistration) -> UserResponse:
             UserCreate(email=data.email, password=data.password, role=UserRole.user)
         )
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=409, detail="Ya existe una cuenta con ese correo."
+        ) from exc
 
     try:
         services_auth.crear_perfil(user.id, profile)
-    except (ValueError, OSError):
-        services_auth.eliminar_usuario(user.id)
-        raise
+    except Exception as exc:
+        try:
+            services_auth.eliminar_usuario(user.id)
+        except Exception as rollback_error:
+            logger.error(
+                "Falló la creación del perfil y su reversión (tipos: %s, %s).",
+                type(exc).__name__,
+                type(rollback_error).__name__,
+            )
+        else:
+            logger.error(
+                "Falló la creación del perfil (tipo: %s).",
+                type(exc).__name__,
+            )
+        raise HTTPException(
+            status_code=500, detail="Error interno del servidor."
+        ) from None
     return user
 
 
@@ -97,7 +115,10 @@ def update_user(
     try:
         return services_auth.actualizar_usuario(user_id, data)
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=409,
+            detail="No se pudo actualizar el usuario por un conflicto.",
+        ) from exc
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

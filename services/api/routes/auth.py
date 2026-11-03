@@ -28,18 +28,45 @@ FORGOT_PASSWORD_MESSAGE = (
 def _create_and_send_reset_email(to_email: str) -> None:
     try:
         token = services_auth.create_reset_token(to_email)
-        if token is None:
-            return
+    except Exception as exc:
+        logger.error(
+            "No se pudo generar el restablecimiento (tipo: %s).",
+            type(exc).__name__,
+        )
+        return
+
+    if token is None:
+        return
+
+    try:
         frontend_base_url = os.getenv(
             "FRONTEND_BASE_URL", "http://localhost:3000"
         ).rstrip("/")
         reset_url = (
             f"{frontend_base_url}/reset-password?{urlencode({'token': token})}"
         )
+    except (TypeError, ValueError) as exc:
+        logger.error(
+            "No se pudo preparar el restablecimiento (tipo: %s).",
+            type(exc).__name__,
+        )
+        return
+
+    try:
         email_service.send_password_reset_email(to_email, reset_url)
+    except email_service.EmailConfigurationError as exc:
+        logger.error(
+            "El envío de restablecimiento no está configurado (tipo: %s).",
+            type(exc).__name__,
+        )
+    except email_service.EmailDeliveryError as exc:
+        logger.error(
+            "Falló la entrega del restablecimiento (tipo: %s).",
+            type(exc).__name__,
+        )
     except Exception as exc:
         logger.error(
-            "No se pudo procesar el correo de restablecimiento (tipo: %s).",
+            "Falló el proceso de envío del restablecimiento (tipo: %s).",
             type(exc).__name__,
         )
 
@@ -73,7 +100,10 @@ def reset_password(data: ResetPasswordRequest) -> dict[str, str]:
     try:
         services_auth.reset_password(data.token, data.new_password)
     except services_auth.InvalidResetTokenError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=400,
+            detail="El token de restablecimiento no es válido.",
+        ) from exc
     return {"message": "Contraseña restablecida correctamente."}
 
 
@@ -87,7 +117,10 @@ def change_password(
             current_user.id, data.current_password, data.new_password
         )
     except services_auth.IncorrectCurrentPasswordError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña actual es incorrecta.",
+        ) from exc
     return {"message": "Contraseña actualizada correctamente."}
 
 

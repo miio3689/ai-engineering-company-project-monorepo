@@ -260,7 +260,7 @@ class IncidentEndpointsTests(unittest.TestCase):
             main.app.dependency_overrides[get_current_user] = override
 
     def test_unexpected_error_is_generic_and_does_not_expose_traceback(self):
-        with self.assertLogs("services.api.routes.incidents", level="ERROR"):
+        with self.assertLogs("services.api.routes.incidents", level="ERROR") as captured:
             with patch.object(
                 incidents,
                 "get_incidents_tables",
@@ -275,6 +275,49 @@ class IncidentEndpointsTests(unittest.TestCase):
         )
         self.assertNotIn("Traceback", response.text)
         self.assertNotIn("test-only internal failure", response.text)
+        self.assertIn("RuntimeError", "\n".join(captured.output))
+        self.assertNotIn("test-only internal failure", "\n".join(captured.output))
+
+    def test_unexpected_analysis_error_is_generic_and_does_not_log_details(self):
+        csv_content = (
+            "incident_id,date,location_id,category,description,status,"
+            "customer_id,satisfaction_score,reporter_id\n"
+            "SYN-002,2026-10-28,COL-01,SUPPLY,Synthetic supply issue,OPEN,,,SYN-EMP-2\n"
+        )
+        with (
+            self.assertLogs("services.api.app.main", level="ERROR") as captured,
+            patch.object(
+                main,
+                "calculate_metrics",
+                side_effect=RuntimeError("internal calculation detail"),
+            ),
+        ):
+            response = self.client.post(
+                "/api/incidents/analyze",
+                files={"file": ("synthetic.csv", csv_content, "text/csv")},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(
+            response.json(),
+            {"detail": "Error interno al analizar el fichero."},
+        )
+        log_output = "\n".join(captured.output)
+        self.assertIn("RuntimeError", log_output)
+        self.assertNotIn("internal calculation detail", response.text + log_output)
+        self.assertNotIn("Traceback", response.text + log_output)
+
+    def test_analyze_bad_extension_keeps_detail_only_400_response(self):
+        response = self.client.post(
+            "/api/incidents/analyze",
+            files={"file": ("synthetic.txt", b"not a CSV", "text/plain")},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {"detail": "El fichero debe tener extensión .csv."},
+        )
 
     def test_auth_validation_still_returns_422(self):
         registration = self.client.post("/users", json={})

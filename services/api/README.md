@@ -193,8 +193,14 @@ account owner.
 
 `forgot-password` schedules email delivery and always returns `200`, including
 when the account does not exist or email delivery fails, so the endpoint does
-not disclose account existence or mail-provider status. Reset tokens are
+not disclose account existence or mail-provider status. Email failures are
+logged with the exception type only; configuration and delivery errors do not
+include addresses, reset links or provider response text. Reset tokens are
 single-use; a successful reset invalidates the token.
+
+Unhandled API exceptions return a generic JSON `500` response. The incident
+CSV analysis endpoint keeps its existing `{ "detail": ... }` error shape, and
+the incident CRUD router keeps its field-specific `400` response format.
 
 ### Verification
 

@@ -157,6 +157,29 @@ class SupplierEndpointsTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 404)
                 self.assertEqual(response.json(), {"detail": "Proveedor no encontrado."})
 
+    def test_unhandled_api_error_returns_structured_generic_500(self):
+        with (
+            self.assertLogs("services.api.app.main", level="ERROR") as captured,
+            patch.object(
+                suppliers,
+                "get_suppliers_table",
+                side_effect=RuntimeError("private storage detail"),
+            ),
+            TestClient(main.app, raise_server_exceptions=False) as client,
+        ):
+            client.headers.update(self.client.headers)
+            response = client.get("/suppliers")
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(
+            response.json(),
+            {"detail": "Error interno del servidor."},
+        )
+        log_output = "\n".join(captured.output)
+        self.assertIn("RuntimeError", log_output)
+        self.assertNotIn("private storage detail", response.text + log_output)
+        self.assertNotIn("Traceback", response.text + log_output)
+
     def test_incident_endpoints_remain_functional(self):
         with patch.object(main, "_latest_metrics", None):
             self.assertEqual(

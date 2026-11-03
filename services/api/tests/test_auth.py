@@ -89,7 +89,31 @@ class AuthEndpointsTests(unittest.TestCase):
             "/users", json={"email": "ALICE@example.com", "password": self.password}
         )
         self.assertEqual(duplicate.status_code, 409)
+        self.assertNotIn("alice@example.com", duplicate.text.lower())
         self.assertEqual(len(services_auth.listar_usuarios()), 1)
+
+    def test_profile_persistence_failure_returns_generic_500_and_rolls_back_user(self):
+        email = "profile-persistence@example.com"
+        with (
+            patch.object(
+                services_auth,
+                "crear_perfil",
+                side_effect=OSError("internal persistence detail"),
+            ),
+            self.assertLogs("services.api.routes.users", level="ERROR") as captured,
+        ):
+            response = self.client.post(
+                "/users",
+                json={"email": email, "password": self.password},
+            )
+
+        log_output = "\n".join(captured.output)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {"detail": "Error interno del servidor."})
+        self.assertIsNone(services_auth.obtener_usuario_por_email(email))
+        self.assertNotIn(email, response.text + log_output)
+        self.assertNotIn("internal persistence detail", response.text + log_output)
+        self.assertIn("OSError", log_output)
 
     def test_non_admin_cannot_submit_role_even_unchanged_or_invalid(self):
         for actor_role in (UserRole.user, UserRole.manager):

@@ -14,12 +14,12 @@ def main() -> None:
         email = EmailModel(email=arguments.email).email
         user = services_auth.obtener_usuario_por_email(email)
         if user is None:
-            parser.error("No existe un usuario registrado con ese email.")
+            parser.error("No existe un usuario registrado con el email indicado.")
         promoted = services_auth.actualizar_usuario(
             user.id, UserUpdate(role=UserRole.admin)
         )
-    except ValueError as exc:
-        parser.error(str(exc))
+    except ValueError:
+        parser.error("El email indicado no es válido.")
     print(f"Usuario {promoted.email} promovido a admin (id={promoted.id}).")
 
 
