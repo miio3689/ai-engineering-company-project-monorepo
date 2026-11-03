@@ -31,6 +31,17 @@ from services.api import database  # noqa: E402
 from tinydb import Query  # noqa: E402
 
 DEFAULT_CSV_PATH = REPOSITORY_ROOT / "scripts" / "incidents-brasaland.csv"
+REQUIRED_CSV_COLUMNS = (
+    "incident_id",
+    "date",
+    "location_id",
+    "category",
+    "description",
+    "status",
+    "customer_id",
+    "satisfaction_score",
+    "reporter_id",
+)
 
 VALIDATION_REASON_LABELS = {
     "missing_or_invalid_location_id": "sede ausente o no válida",
@@ -52,6 +63,10 @@ class CsvReadError(Exception):
     """A user-facing, safe-to-print error while reading the input CSV."""
 
 
+class DatabaseAccessError(Exception):
+    """A safe-to-display error while accessing the incidents database."""
+
+
 @dataclass
 class SeedResult:
     rows_read: int = 0
@@ -70,6 +85,8 @@ def _read_csv(csv_path: Path) -> list[tuple[int, dict[str, Any]]]:
             reader = csv.DictReader(csv_file, strict=True)
             if not reader.fieldnames:
                 raise CsvReadError("El CSV está vacío o no contiene cabecera.")
+            if not set(REQUIRED_CSV_COLUMNS).issubset(reader.fieldnames):
+                raise CsvReadError("Al CSV le faltan columnas requeridas.")
             return [
                 (row_number, row)
                 for row_number, row in enumerate(reader, start=2)
@@ -176,53 +193,57 @@ def seed_csv(csv_path: Path) -> SeedResult:
     result = SeedResult(rows_read=len(rows))
     query = Query()
 
-    with database.get_incidents_tables() as (incidents, seed_keys):
-        for row_number, record in rows:
-            is_valid, validation_failures = validate_record(record)
-            if not is_valid:
-                result.discarded += 1
-                result.discarded_by_reason.update(validation_failures)
-                _print_discarded(row_number, record, validation_failures)
-                continue
+    try:
+        with database.get_incidents_tables() as (incidents, seed_keys):
+            for row_number, record in rows:
+                is_valid, validation_failures = validate_record(record)
+                if not is_valid:
+                    result.discarded += 1
+                    result.discarded_by_reason.update(validation_failures)
+                    _print_discarded(row_number, record, validation_failures)
+                    continue
 
-            try:
-                transformed = transform_csv_record(record)
-            except ValueError as exc:
-                reason = _transform_failure_reason(exc)
-                result.discarded += 1
-                result.discarded_by_reason[reason] += 1
-                _print_discarded(row_number, record, [reason])
-                continue
+                try:
+                    transformed = transform_csv_record(record)
+                except ValueError as exc:
+                    reason = _transform_failure_reason(exc)
+                    result.discarded += 1
+                    result.discarded_by_reason[reason] += 1
+                    _print_discarded(row_number, record, [reason])
+                    continue
 
-            result.valid_rows += 1
-            source_key = _source_key(record, transformed)
-            if seed_keys.contains(query.source_key == source_key):
-                result.duplicates += 1
-                continue
+                result.valid_rows += 1
+                source_key = _source_key(record, transformed)
+                if seed_keys.contains(query.source_key == source_key):
+                    result.duplicates += 1
+                    continue
 
-            inserted_at = datetime_now_utc()
-            incident_record = transformed | {"updated_at": inserted_at}
-            incident_document_id = incidents.insert(incident_record)
-            seed_keys.insert(
-                {
-                    "source_key": source_key,
-                    "incident_document_id": incident_document_id,
-                }
+                inserted_at = datetime_now_utc()
+                incident_record = transformed | {"updated_at": inserted_at}
+                incident_document_id = incidents.insert(incident_record)
+                seed_keys.insert(
+                    {
+                        "source_key": source_key,
+                        "incident_document_id": incident_document_id,
+                    }
+                )
+                result.inserted += 1
+
+            stored_records = [dict(record) for record in incidents.all()]
+            result.status_totals = _count_totals(
+                stored_records,
+                INCIDENT_STATUSES,
+                "status",
             )
-            result.inserted += 1
-
-        stored_records = [dict(record) for record in incidents.all()]
-        result.status_totals = _count_totals(
-            stored_records,
-            INCIDENT_STATUSES,
-            "status",
-        )
-        result.category_totals = _count_totals(
-            stored_records,
-            INCIDENT_CATEGORIES,
-            "category",
-        )
-
+            result.category_totals = _count_totals(
+                stored_records,
+                INCIDENT_CATEGORIES,
+                "category",
+            )
+    except (OSError, json.JSONDecodeError, TypeError) as exc:
+        raise DatabaseAccessError(
+            "No se pudo acceder a la base de datos de incidencias."
+        ) from exc
     _print_report(result)
     return result
 
@@ -247,6 +268,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         seed_csv(args.csv_path)
     except CsvReadError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    except DatabaseAccessError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     return 0

@@ -2,7 +2,7 @@
 
 import io
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -144,6 +144,35 @@ class SupplierEndpointsTests(unittest.TestCase):
                     response = self.client.patch(f"/suppliers/1/{path}", json=payload)
                     self.assertEqual(response.status_code, 422)
                     open_table.assert_not_called()
+
+    def test_supplier_seed_validation_failure_has_nonzero_exit(self):
+        error_output = io.StringIO()
+        with (
+            patch.object(seed, "SUPPLIERS_SEED", [{"name": "invalid"}]),
+            patch.object(seed, "get_suppliers_table") as open_table,
+            redirect_stderr(error_output),
+        ):
+            with self.assertRaises(SystemExit) as raised:
+                seed.main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertIn("los datos semilla de proveedores no son válidos", error_output.getvalue())
+        self.assertNotIn("Traceback", error_output.getvalue())
+        open_table.assert_not_called()
+
+    def test_supplier_seed_database_failure_has_nonzero_exit(self):
+        error_output = io.StringIO()
+        with (
+            patch.object(seed, "get_suppliers_table", side_effect=OSError("private path")),
+            redirect_stderr(error_output),
+        ):
+            with self.assertRaises(SystemExit) as raised:
+                seed.main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertIn("no se pudo acceder a la base de datos de proveedores", error_output.getvalue())
+        self.assertNotIn("private path", error_output.getvalue())
+        self.assertNotIn("Traceback", error_output.getvalue())
 
     def test_missing_ids(self):
         for method, url, kwargs in [

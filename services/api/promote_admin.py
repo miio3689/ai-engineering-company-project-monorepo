@@ -12,14 +12,22 @@ def main() -> None:
     arguments = parser.parse_args()
     try:
         email = EmailModel(email=arguments.email).email
+    except ValueError:
+        parser.error("El email indicado no es válido.")
+
+    try:
         user = services_auth.obtener_usuario_por_email(email)
-        if user is None:
-            parser.error("No existe un usuario registrado con el email indicado.")
+    except Exception:
+        parser.error("No se pudo consultar el usuario en la base de datos.")
+    if user is None:
+        parser.error("No existe un usuario registrado con el email indicado.")
+
+    try:
         promoted = services_auth.actualizar_usuario(
             user.id, UserUpdate(role=UserRole.admin)
         )
-    except ValueError:
-        parser.error("El email indicado no es válido.")
+    except Exception:
+        parser.error("No se pudo actualizar el rol del usuario.")
     print(f"Usuario {promoted.email} promovido a admin (id={promoted.id}).")
 
 

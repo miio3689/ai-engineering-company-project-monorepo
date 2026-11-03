@@ -1,7 +1,10 @@
 """Load the 15 exact suppliers from the Milestone 09 Brasaland briefing."""
 
 from datetime import datetime, timezone
+import json
+import sys
 
+from pydantic import ValidationError
 from tinydb import Query
 
 from .database import get_suppliers_table
@@ -158,21 +161,30 @@ SUPPLIERS_SEED = [
 
 def main() -> None:
     """Insert missing suppliers without overwriting existing procurement data."""
-    suppliers = [Supplier.model_validate(record) for record in SUPPLIERS_SEED]
+    try:
+        suppliers = [Supplier.model_validate(record) for record in SUPPLIERS_SEED]
+    except ValidationError:
+        print("Error: los datos semilla de proveedores no son válidos.", file=sys.stderr)
+        sys.exit(1)
+
     inserted = 0
     skipped = 0
     query = Query()
 
-    with get_suppliers_table() as table:
-        for supplier in suppliers:
-            if table.contains(query.name == supplier.name):
-                skipped += 1
-                continue
-            record = supplier.model_dump(mode="json", exclude_none=True)
-            record["updated_at"] = datetime.now(timezone.utc).isoformat()
-            table.insert(record)
-            inserted += 1
-        total = len(table)
+    try:
+        with get_suppliers_table() as table:
+            for supplier in suppliers:
+                if table.contains(query.name == supplier.name):
+                    skipped += 1
+                    continue
+                record = supplier.model_dump(mode="json", exclude_none=True)
+                record["updated_at"] = datetime.now(timezone.utc).isoformat()
+                table.insert(record)
+                inserted += 1
+            total = len(table)
+    except (OSError, json.JSONDecodeError, TypeError):
+        print("Error: no se pudo acceder a la base de datos de proveedores.", file=sys.stderr)
+        sys.exit(1)
 
     print(f"Proveedores insertados: {inserted}")
     print(f"Proveedores omitidos por existir: {skipped}")

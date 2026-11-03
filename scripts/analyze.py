@@ -27,11 +27,43 @@ from brasaland_shared.incidents import (  # noqa: E402
     validate_record,
 )
 
+REQUIRED_CSV_COLUMNS = (
+    "incident_id",
+    "date",
+    "location_id",
+    "category",
+    "description",
+    "status",
+    "customer_id",
+    "satisfaction_score",
+    "reporter_id",
+)
+
+
+class CsvReadError(Exception):
+    """A safe-to-display error while reading the input CSV."""
+
 
 def read_records(csv_path: str | Path) -> list[dict[str, str]]:
     """Load incident rows from a UTF-8 CSV file with a header row."""
-    with Path(csv_path).open("r", encoding="utf-8-sig", newline="") as csv_file:
-        return [dict(row) for row in csv.DictReader(csv_file)]
+    try:
+        with Path(csv_path).open("r", encoding="utf-8-sig", newline="") as csv_file:
+            reader = csv.DictReader(csv_file, strict=True)
+            if not reader.fieldnames:
+                raise CsvReadError("El CSV está vacío o no contiene una cabecera.")
+            if not set(REQUIRED_CSV_COLUMNS).issubset(reader.fieldnames):
+                raise CsvReadError("Al CSV le faltan columnas requeridas.")
+            return [dict(row) for row in reader]
+    except FileNotFoundError as exc:
+        raise CsvReadError("No se encontró el archivo CSV indicado.") from exc
+    except PermissionError as exc:
+        raise CsvReadError("No hay permisos para leer el archivo CSV indicado.") from exc
+    except UnicodeDecodeError as exc:
+        raise CsvReadError("El CSV debe estar codificado en UTF-8.") from exc
+    except csv.Error as exc:
+        raise CsvReadError("El archivo CSV tiene un formato no válido.") from exc
+    except OSError as exc:
+        raise CsvReadError("No se pudo leer el archivo CSV indicado.") from exc
 
 
 def calculate_metrics(records: Sequence[Record]) -> dict[str, Any]:
@@ -196,15 +228,29 @@ def export_results(metrics: Mapping[str, Any], output_path: str | Path = "result
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Analyze a Brasaland incidents CSV file.")
-    parser.add_argument("csv_path", help="Path to the incident CSV file")
+    parser.add_argument("csv_path", nargs="?", help="Path to the incident CSV file")
     args = parser.parse_args()
+    if args.csv_path is None:
+        parser.error("Debe indicar la ruta del archivo CSV.")
 
-    records = read_records(args.csv_path)
+    try:
+        records = read_records(args.csv_path)
+    except CsvReadError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
     metrics = calculate_metrics(records)
     print_report(metrics, args.csv_path)
-    answer = input("¿Deseas exportar los resultados a CSV? [s / n] ").strip().lower()
+    try:
+        answer = input("¿Deseas exportar los resultados a CSV? [s / n] ").strip().lower()
+    except EOFError:
+        print("Error: no se recibió una respuesta para exportar.", file=sys.stderr)
+        sys.exit(1)
     if answer == "s":
-        export_results(metrics)
+        try:
+            export_results(metrics)
+        except OSError:
+            print("Error: no se pudieron escribir los resultados CSV.", file=sys.stderr)
+            sys.exit(1)
         print("Results exported to results.csv")
 
 
