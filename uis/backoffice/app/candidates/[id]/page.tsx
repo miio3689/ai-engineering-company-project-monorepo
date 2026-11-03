@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import CandidateDetailManager from "@/components/candidate-detail-manager";
+import PageLoadError from "@/components/page-load-error";
 import { fetchCandidateById, fetchCandidateNotes } from "@/services/api";
+import type { Candidate, CandidateNote } from "@/types/models";
 
 export const dynamic = "force-dynamic";
 
@@ -60,13 +62,37 @@ export default async function CandidateDetailPage({
     notFound();
   }
 
-  const candidate = await fetchCandidateById(candidateId);
+  let candidate: Candidate | null;
+  try {
+    candidate = await fetchCandidateById(candidateId);
+  } catch {
+    return (
+      <PageLoadError
+        title="No se pudo cargar la candidatura"
+        message="El servicio no está disponible. Inténtalo de nuevo o vuelve al listado."
+        exitHref="/"
+        exitLabel="Volver al listado"
+      />
+    );
+  }
 
   if (!candidate) {
     notFound();
   }
 
-  const notes = await fetchCandidateNotes(candidateId);
+  let notes: CandidateNote[];
+  try {
+    notes = await fetchCandidateNotes(candidateId);
+  } catch {
+    return (
+      <PageLoadError
+        title="No se pudieron cargar las notas"
+        message="La candidatura está disponible, pero no se pudieron cargar sus notas. Inténtalo de nuevo."
+        exitHref="/"
+        exitLabel="Volver al listado"
+      />
+    );
+  }
 
   const backHref = buildBackHref(
     resolvedSearchParams.q,

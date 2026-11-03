@@ -1,5 +1,6 @@
 import type { Candidate, CandidateNote, CandidateStage, CandidateStatus } from "@/types/models";
 import { apiRequest } from "@/services/api-client";
+import { buildApiErrorMessage, readJsonResponse } from "@/services/api-errors";
 
 interface RecordOut {
   id: string;
@@ -15,27 +16,11 @@ interface RecordOut {
   applied_at: string;
 }
 
-interface RecordsResponse {
-  data: RecordOut[];
-}
-
 interface CandidateNoteOut {
   id: string;
   candidate_id: string;
   content: string;
   created_at: string;
-}
-
-interface CandidateNotesResponse {
-  data: CandidateNoteOut[];
-}
-
-interface RecordResponse {
-  data: RecordOut;
-}
-
-interface CandidateNoteResponse {
-  data: CandidateNoteOut;
 }
 
 interface CandidatePayload {
@@ -61,7 +46,7 @@ function parseStatus(status: string): Candidate["status"] {
     return status;
   }
 
-  throw new Error(`Estado invalido recibido desde la API: ${status}`);
+  throw new Error("La API devolvió un estado de candidatura no válido.");
 }
 
 function parseStage(stage: string): Candidate["stage"] {
@@ -75,22 +60,22 @@ function parseStage(stage: string): Candidate["stage"] {
     return stage;
   }
 
-  throw new Error(`Etapa invalida recibida desde la API: ${stage}`);
+  throw new Error("La API devolvió una etapa de candidatura no válida.");
 }
 
 function mapRecordToCandidate(record: RecordOut): Candidate {
   return {
     id: record.id,
-    name: record.full_name,
-    email: record.email,
-    phone: record.phone,
-    position: record.position,
+    name: record.full_name ?? "Nombre no disponible",
+    email: record.email ?? "",
+    phone: record.phone ?? "",
+    position: record.position ?? "Puesto no disponible",
     linkedinUrl: record.linkedin_url ?? undefined,
     resumeUrl: record.cv_url ?? undefined,
-    yearsOfExperience: record.experience_years,
+    yearsOfExperience: record.experience_years ?? 0,
     status: parseStatus(record.status),
     stage: parseStage(record.stage),
-    appliedAt: record.applied_at,
+    appliedAt: record.applied_at ?? "",
   };
 }
 
@@ -98,8 +83,8 @@ function mapNoteToCandidateNote(note: CandidateNoteOut): CandidateNote {
   return {
     id: note.id,
     candidateId: note.candidate_id,
-    content: note.content,
-    createdAt: note.created_at,
+    content: note.content ?? "",
+    createdAt: note.created_at ?? "",
   };
 }
 
@@ -118,35 +103,41 @@ function mapCandidatePayloadToApi(payload: CandidatePayload): Omit<RecordOut, "i
   };
 }
 
-function getStringProperty(payload: unknown, key: string): string | null {
-  if (!payload || typeof payload !== "object" || !(key in payload)) {
-    return null;
-  }
-
-  const value = (payload as Record<string, unknown>)[key];
-  return typeof value === "string" && value.trim() ? value : null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
-async function buildApiErrorMessage(response: Response): Promise<string> {
-  const fallback = `Error API ${response.status}: ${response.statusText || "respuesta invalida"}`;
-
-  try {
-    const contentType = response.headers.get("content-type") ?? "";
-
-    if (contentType.includes("application/json")) {
-      const payload: unknown = await response.json();
-      const message = getStringProperty(payload, "message")
-        ?? getStringProperty(payload, "error")
-        ?? getStringProperty(payload, "detail");
-
-      return message ? `Error API ${response.status}: ${message}` : fallback;
-    }
-
-    const text = await response.text();
-    return text.trim() ? `Error API ${response.status}: ${text.trim()}` : fallback;
-  } catch {
-    return fallback;
+function toRecordOut(value: unknown): RecordOut {
+  if (!isRecord(value) || typeof value.id !== "string" || !value.id) {
+    throw new Error("El servicio devolvió una candidatura no válida.");
   }
+
+  return {
+    id: value.id,
+    full_name: typeof value.full_name === "string" ? value.full_name : "Nombre no disponible",
+    email: typeof value.email === "string" ? value.email : "",
+    phone: typeof value.phone === "string" ? value.phone : "",
+    position: typeof value.position === "string" ? value.position : "Puesto no disponible",
+    linkedin_url: typeof value.linkedin_url === "string" ? value.linkedin_url : null,
+    cv_url: typeof value.cv_url === "string" ? value.cv_url : null,
+    status: typeof value.status === "string" ? value.status : "",
+    stage: typeof value.stage === "string" ? value.stage : "",
+    experience_years: typeof value.experience_years === "number" ? value.experience_years : 0,
+    applied_at: typeof value.applied_at === "string" ? value.applied_at : "",
+  };
+}
+
+function toCandidateNoteOut(value: unknown): CandidateNoteOut {
+  if (!isRecord(value) || typeof value.id !== "string" || !value.id) {
+    throw new Error("El servicio devolvió una nota no válida.");
+  }
+
+  return {
+    id: value.id,
+    candidate_id: typeof value.candidate_id === "string" ? value.candidate_id : "",
+    content: typeof value.content === "string" ? value.content : "",
+    created_at: typeof value.created_at === "string" ? value.created_at : "",
+  };
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -162,7 +153,7 @@ async function getJson<T>(path: string): Promise<T> {
     throw new Error(await buildApiErrorMessage(response));
   }
 
-  return (await response.json()) as T;
+  return readJsonResponse<T>(response);
 }
 
 async function sendJson<TResponse>(
@@ -183,31 +174,43 @@ async function sendJson<TResponse>(
     throw new Error(await buildApiErrorMessage(response));
   }
 
-  return (await response.json()) as TResponse;
+  return readJsonResponse<TResponse>(response);
 }
 
-function extractRecord(payload: RecordOut | RecordResponse): RecordOut {
+function extractRecord(payload: unknown): RecordOut {
+  if (!isRecord(payload)) {
+    throw new Error("El servicio devolvió una candidatura no válida.");
+  }
   if ("data" in payload) {
-    return payload.data;
+    return toRecordOut(payload.data);
   }
 
-  return payload;
+  return toRecordOut(payload);
 }
 
-function extractNote(payload: CandidateNoteOut | CandidateNoteResponse): CandidateNoteOut {
+function extractNote(payload: unknown): CandidateNoteOut {
+  if (!isRecord(payload)) {
+    throw new Error("El servicio devolvió una nota no válida.");
+  }
   if ("data" in payload) {
-    return payload.data;
+    return toCandidateNoteOut(payload.data);
   }
 
-  return payload;
+  return toCandidateNoteOut(payload);
 }
 
-function extractNotes(payload: CandidateNoteOut[] | CandidateNotesResponse): CandidateNoteOut[] {
+function extractNotes(payload: unknown): CandidateNoteOut[] {
   if (Array.isArray(payload)) {
-    return payload;
+    return payload.map(toCandidateNoteOut);
   }
 
-  return payload.data;
+  if (!isRecord(payload)) {
+    throw new Error("El servicio devolvió una respuesta de notas no válida.");
+  }
+  if (!Array.isArray(payload.data)) {
+    throw new Error("El servicio devolvió una respuesta de notas no válida.");
+  }
+  return payload.data.map(toCandidateNoteOut);
 }
 
 async function sendNoContent(path: string, method: "DELETE"): Promise<void> {
@@ -225,8 +228,11 @@ async function sendNoContent(path: string, method: "DELETE"): Promise<void> {
 }
 
 export async function fetchCandidates(): Promise<Candidate[]> {
-  const response = await getJson<RecordsResponse>("/records");
-  return response.data.map(mapRecordToCandidate);
+  const response = await getJson<unknown>("/records");
+  if (!isRecord(response) || !Array.isArray(response.data)) {
+    throw new Error("El servicio devolvió un listado de candidaturas no válido.");
+  }
+  return response.data.map((record) => mapRecordToCandidate(toRecordOut(record)));
 }
 
 export async function fetchCandidateById(id: string): Promise<Candidate | null> {
@@ -246,13 +252,13 @@ export async function fetchCandidateById(id: string): Promise<Candidate | null> 
     throw new Error(await buildApiErrorMessage(response));
   }
 
-  const payload = (await response.json()) as RecordOut | RecordResponse;
+  const payload = await readJsonResponse<unknown>(response);
   const record = extractRecord(payload);
   return mapRecordToCandidate(record);
 }
 
 export async function fetchCandidateNotes(candidateId: string): Promise<CandidateNote[]> {
-  const response = await getJson<CandidateNotesResponse | CandidateNoteOut[]>(`/records/${candidateId}/notes`);
+  const response = await getJson<unknown>(`/records/${candidateId}/notes`);
   return extractNotes(response).map(mapNoteToCandidateNote);
 }
 
@@ -260,7 +266,7 @@ export async function updateCandidateStatus(
   candidateId: string,
   status: CandidateStatus,
 ): Promise<Candidate> {
-  const response = await sendJson<RecordOut | RecordResponse>(`/records/${candidateId}`, "PATCH", { status });
+  const response = await sendJson<unknown>(`/records/${candidateId}`, "PATCH", { status });
   const record = extractRecord(response);
   return mapRecordToCandidate(record);
 }
@@ -269,13 +275,13 @@ export async function updateCandidateStage(
   candidateId: string,
   stage: CandidateStage,
 ): Promise<Candidate> {
-  const response = await sendJson<RecordOut | RecordResponse>(`/records/${candidateId}`, "PATCH", { stage });
+  const response = await sendJson<unknown>(`/records/${candidateId}`, "PATCH", { stage });
   const record = extractRecord(response);
   return mapRecordToCandidate(record);
 }
 
 export async function addCandidateNote(candidateId: string, content: string): Promise<CandidateNote> {
-  const response = await sendJson<CandidateNoteOut | CandidateNoteResponse>(
+  const response = await sendJson<unknown>(
     `/records/${candidateId}/notes`,
     "POST",
     { content },
@@ -289,7 +295,7 @@ export async function deleteCandidateNote(candidateId: string, noteId: string): 
 }
 
 export async function createCandidate(payload: CandidatePayload): Promise<Candidate> {
-  const response = await sendJson<RecordOut | RecordResponse>("/records", "POST", mapCandidatePayloadToApi(payload));
+  const response = await sendJson<unknown>("/records", "POST", mapCandidatePayloadToApi(payload));
   const record = extractRecord(response);
   return mapRecordToCandidate(record);
 }
@@ -298,7 +304,7 @@ export async function updateCandidate(
   candidateId: string,
   payload: CandidatePayload,
 ): Promise<Candidate> {
-  const response = await sendJson<RecordOut | RecordResponse>(
+  const response = await sendJson<unknown>(
     `/records/${candidateId}`,
     "PATCH",
     mapCandidatePayloadToApi(payload),

@@ -25,23 +25,27 @@ export function useIncidentList(filters: IncidentFilters) {
   const { status, origin, branch } = filters;
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<IncidentListResult | null>(null);
+  const [requestLoading, setRequestLoading] = useState(true);
   const key = JSON.stringify([
     status ?? "",
     origin ?? "",
     branch ?? "",
     attempt,
   ]);
-  const loading = result?.key !== key;
+  const loading = requestLoading || result?.key !== key;
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchIncidents({ status, origin, branch }, controller.signal)
-      .then((incidents) => {
+    async function loadIncidents() {
+      try {
+        const incidents = await fetchIncidents(
+          { status, origin, branch },
+          controller.signal,
+        );
         if (!controller.signal.aborted) {
           setResult({ key, incidents, error: null });
         }
-      })
-      .catch((error: unknown) => {
+      } catch (error: unknown) {
         if (!controller.signal.aborted) {
           setResult({
             key,
@@ -51,7 +55,12 @@ export function useIncidentList(filters: IncidentFilters) {
               : "No se pudo cargar el listado de incidencias. Inténtalo de nuevo.",
           });
         }
-      });
+      } finally {
+        if (!controller.signal.aborted) setRequestLoading(false);
+      }
+    }
+
+    void loadIncidents();
     return () => controller.abort();
   }, [status, origin, branch, key]);
 
@@ -79,17 +88,18 @@ export function useIncidentList(filters: IncidentFilters) {
 export function useIncidentSummary() {
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<SummaryResult | null>(null);
-  const loading = result?.attempt !== attempt;
+  const [requestLoading, setRequestLoading] = useState(true);
+  const loading = requestLoading || result?.attempt !== attempt;
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchIncidentSummary(controller.signal)
-      .then((summary) => {
+    async function loadSummary() {
+      try {
+        const summary = await fetchIncidentSummary(controller.signal);
         if (!controller.signal.aborted) {
           setResult({ attempt, summary, error: null });
         }
-      })
-      .catch((error: unknown) => {
+      } catch (error: unknown) {
         if (!controller.signal.aborted) {
           setResult({
             attempt,
@@ -99,7 +109,12 @@ export function useIncidentSummary() {
               : "No se pudo cargar el resumen. Inténtalo de nuevo.",
           });
         }
-      });
+      } finally {
+        if (!controller.signal.aborted) setRequestLoading(false);
+      }
+    }
+
+    void loadSummary();
     return () => controller.abort();
   }, [attempt]);
 

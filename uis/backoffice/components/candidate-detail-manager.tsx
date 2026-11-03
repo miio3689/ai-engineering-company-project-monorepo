@@ -40,7 +40,7 @@ function toFormValues(candidate: Candidate): CandidateFormValues {
     yearsOfExperience: String(candidate.yearsOfExperience),
     status: candidate.status,
     stage: candidate.stage,
-    appliedAt: candidate.appliedAt.slice(0, 10),
+    appliedAt: candidate.appliedAt?.slice(0, 10) ?? "",
   };
 }
 

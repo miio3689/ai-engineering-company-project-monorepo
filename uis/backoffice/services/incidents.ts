@@ -37,8 +37,7 @@ async function responseError(response: Response): Promise<IncidentServiceError> 
     let payload: unknown;
     try {
       payload = await response.json();
-    } catch (error) {
-      if (!(error instanceof SyntaxError)) throw error;
+    } catch {
       return new IncidentServiceError(
         "Los datos no son válidos. Revísalos e inténtalo de nuevo.",
       );
@@ -98,8 +97,7 @@ async function readResponse<T>(response: Response): Promise<T> {
   if (!response.ok) throw await responseError(response);
   try {
     return (await response.json()) as T;
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
+  } catch {
     throw new IncidentServiceError(
       "El servicio devolvió una respuesta no válida. Inténtalo de nuevo.",
     );

@@ -29,8 +29,7 @@ export class AuthError extends Error {
 async function readAuthJson(response: Response): Promise<unknown> {
   try {
     return await response.json();
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
+  } catch {
     throw new AuthError("La API devolvió una respuesta no válida. Inténtalo de nuevo.");
   }
 }
@@ -74,7 +73,9 @@ async function responseError(
       fields,
     );
   }
-  return new AuthError(`No se pudo ${action} (HTTP ${response.status}). Inténtalo de nuevo.`);
+  return new AuthError(
+    `No se pudo ${action}. El servicio no está disponible, inténtalo más tarde.`,
+  );
 }
 
 export async function forgotPassword(input: ForgotPasswordInput): Promise<void> {

@@ -17,7 +17,7 @@ export default function AccountProfile() {
         <>
           <dl className="grid gap-1">
             <dt className="font-semibold">Correo electrónico</dt>
-            <dd className="break-all">{account.email}</dd>
+            <dd className="break-all">{account.email ?? "Correo no disponible"}</dd>
           </dl>
           <p className="text-sm text-gray-600">El correo no se puede modificar desde esta vista.</p>
           {account.profile ? (

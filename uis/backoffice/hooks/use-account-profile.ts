@@ -24,18 +24,26 @@ export function useAccountProfile() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchAccount(controller.signal)
-      .then((data) => {
+    async function loadAccount() {
+      try {
+        const data = await fetchAccount(controller.signal);
         if (controller.signal.aborted) return;
         setAccount(data);
-        setDraft(data.profile ? { name: data.profile.name, phone: data.profile.phone, address: data.profile.address } : { name: "", phone: null, address: null });
-      })
-      .catch((caught: unknown) => {
+        setDraft(data.profile
+          ? {
+            name: data.profile.name ?? "",
+            phone: data.profile.phone ?? null,
+            address: data.profile.address ?? null,
+          }
+          : { name: "", phone: null, address: null });
+      } catch (caught: unknown) {
         if (!controller.signal.aborted) setError(friendlyError(caught));
-      })
-      .finally(() => {
+      } finally {
         if (!controller.signal.aborted) setLoading(false);
-      });
+      }
+    }
+
+    void loadAccount();
     return () => controller.abort();
   }, [attempt]);
 

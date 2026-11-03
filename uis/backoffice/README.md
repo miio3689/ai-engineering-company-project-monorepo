@@ -51,6 +51,15 @@ el token y el cliente conserva el manejo de 401. El guard evita mostrar las
 vistas en el navegador; no sustituye la autorización del backend ni evita la
 ejecución o serialización de componentes de servidor de Next.js.
 
+### Errores de carga y API
+
+Las páginas que cargan candidaturas muestran un error local con reintento y
+una salida a otra sección cuando falla la API. Los errores inesperados se
+presentan con mensajes controlados; las validaciones estructuradas `400`/`422`
+siguen mostrando sus detalles útiles. El cliente no presenta códigos HTTP,
+respuestas crudas ni mensajes de configuración. El manejo centralizado de
+logout ante `401` permanece sin cambios.
+
 Los componentes de servidor existentes no tienen acceso a `localStorage`.
 No se cambia su modelo de carga en esta tarea. Además, `services/api` no
 implementa `/records`, que consume el Tracker: la redirección a `/` funciona,
