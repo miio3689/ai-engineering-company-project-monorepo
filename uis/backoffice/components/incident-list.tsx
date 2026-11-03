@@ -21,7 +21,7 @@ import {
 } from "@/types/incident";
 
 function displayDate(value: string): string {
-  const date = new Date(value);
+  const date = new Date(value ?? "");
   if (Number.isNaN(date.getTime())) return "Fecha no disponible";
   return new Intl.DateTimeFormat("es-CO", {
     dateStyle: "medium",
@@ -39,7 +39,7 @@ function StatusAction({
   onChange: (status: IncidentStatus) => void;
 }) {
   const [selected, setSelected] = useState("");
-  const options = INCIDENT_STATUS_TRANSITIONS[incident.status];
+  const options = INCIDENT_STATUS_TRANSITIONS[incident.status] ?? [];
 
   if (options.length === 0) {
     return <p className="text-sm text-gray-600">Estado final</p>;
@@ -217,8 +217,8 @@ export default function IncidentList() {
                 <article className="grid min-w-0 gap-4 rounded-xl border border-gray-200 p-4 sm:p-5">
                   <header className="flex min-w-0 flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="break-words text-lg font-bold">{incident.title}</h3>
-                      <p className="mt-2 break-words text-gray-700">{incident.description}</p>
+                      <h3 className="break-words text-lg font-bold">{incident.title ?? "Título no disponible"}</h3>
+                      <p className="mt-2 break-words text-gray-700">{incident.description ?? "Descripción no disponible"}</p>
                     </div>
                     <span className="inline-flex min-h-8 shrink-0 items-center rounded-full bg-orange-100 px-3 py-1 text-sm font-semibold text-orange-950">
                       {getIncidentOptionLabel(INCIDENT_STATUSES, incident.status)}

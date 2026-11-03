@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import CandidateListFilters from "@/components/candidate-list-filters";
 import CreateCandidateForm from "@/components/create-candidate-form";
+import PageLoadError from "@/components/page-load-error";
 import { getStageLabel, getStatusLabel } from "@/lib/candidate-labels";
 import { fetchCandidates } from "@/services/api";
 import type { Candidate, CandidateStage, CandidateStatus } from "@/types/models";
@@ -95,7 +96,19 @@ export default async function CandidatesPage({ searchParams }: CandidatesPagePro
   const statusFilter = parseStatus(getSingleValue(resolvedSearchParams.status));
   const stageFilter = parseStage(getSingleValue(resolvedSearchParams.stage));
 
-  const candidates = await fetchCandidates();
+  let candidates: Candidate[];
+  try {
+    candidates = await fetchCandidates();
+  } catch {
+    return (
+      <PageLoadError
+        title="No se pudieron cargar las candidaturas"
+        message="El servicio no está disponible. Inténtalo de nuevo o consulta otra sección."
+        exitHref="/incidents"
+        exitLabel="Ir al análisis de incidencias"
+      />
+    );
+  }
   const filteredCandidates = candidates.filter((candidate) => {
     const matchesStatus = !statusFilter || candidate.status === statusFilter;
     const matchesStage = !stageFilter || candidate.stage === stageFilter;

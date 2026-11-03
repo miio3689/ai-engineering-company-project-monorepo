@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 import os
 import sys
 from pathlib import Path
@@ -11,9 +12,9 @@ from threading import Lock
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(REPOSITORY_ROOT / "services" / "api" / ".env")
@@ -42,6 +43,7 @@ EXPECTED_COLUMNS = (
 )
 
 app = FastAPI(title="Brasaland Incidents API", version="1.0.0")
+logger = logging.getLogger(__name__)
 app.include_router(suppliers_router)
 app.include_router(incidents_router)
 app.include_router(auth_router)
@@ -64,6 +66,15 @@ app.add_middleware(
 )
 _latest_metrics: dict[str, Any] | None = None
 _metrics_lock = Lock()
+
+
+@app.exception_handler(Exception)
+async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    logger.error("Unhandled API error (type: %s).", type(exc).__name__)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor."},
+    )
 
 
 def parse_incident_csv(content: bytes) -> list[dict[str, str]]:
@@ -127,10 +138,38 @@ async def analyze_incidents(
 
     try:
         if file.filename and Path(file.filename).suffix.lower() != ".csv":
-            raise HTTPException(status_code=400, detail="El fichero debe tener extensión .csv.")
-        content = await file.read()
-        records = parse_incident_csv(content)
-        metrics = calculate_metrics(records)
+            raise HTTPException(
+                status_code=400, detail="El fichero debe tener extensión .csv."
+            )
+
+        try:
+            content = await file.read()
+        except Exception as exc:
+            logger.error("No se pudo leer el CSV (tipo: %s).", type(exc).__name__)
+            raise HTTPException(
+                status_code=500, detail="Error interno al analizar el fichero."
+            ) from exc
+
+        try:
+            records = parse_incident_csv(content)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error("No se pudo procesar el CSV (tipo: %s).", type(exc).__name__)
+            raise HTTPException(
+                status_code=500, detail="Error interno al analizar el fichero."
+            ) from exc
+
+        try:
+            metrics = calculate_metrics(records)
+        except Exception as exc:
+            logger.error(
+                "Falló el cálculo del análisis CSV (tipo: %s).",
+                type(exc).__name__,
+            )
+            raise HTTPException(
+                status_code=500, detail="Error interno al analizar el fichero."
+            ) from exc
 
         invalid_by_rule = {
             rule: count
@@ -168,14 +207,8 @@ async def analyze_incidents(
         with _metrics_lock:
             _latest_metrics = metrics
         return result
-    except HTTPException:
-        raise
-    except Exception as exc:
-        # Keep implementation details out of the public response.
-        raise HTTPException(status_code=500, detail="Error interno al analizar el fichero.") from exc
     finally:
         await file.close()
-
 
 @app.get("/api/incidents/results/export")
 def export_latest_results(

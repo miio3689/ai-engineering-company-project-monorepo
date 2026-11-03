@@ -24,4 +24,6 @@ def update_my_profile(
     try:
         return services_auth.actualizar_perfil(current_user.id, data)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=422, detail="Los datos del perfil no son válidos."
+        ) from exc

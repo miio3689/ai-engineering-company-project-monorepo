@@ -14,6 +14,7 @@ from tinydb import TinyDB
 
 from services.api import email_service, services_auth
 from services.api.models import UserCreate
+from services.api.routes.auth import FORGOT_PASSWORD_MESSAGE
 
 with patch.object(dotenv, "load_dotenv"):
     from services.api.app import main
@@ -101,6 +102,46 @@ class PasswordRouteTests(unittest.TestCase):
                 )
             },
         )
+
+    def test_resend_failure_keeps_generic_response_and_logs_no_email_or_details(self):
+        with (
+            patch.dict(os.environ, {"RESEND_API_KEY": "test-key"}),
+            patch.object(
+                email_service.resend.Emails,
+                "send",
+                side_effect=email_service.resend.exceptions.ResendError(
+                    "500",
+                    "application_error",
+                    "private provider response",
+                    "",
+                ),
+            ),
+            self.assertLogs("services.api.routes.auth", level="ERROR") as captured,
+        ):
+            response = self.client.post(
+                "/auth/forgot-password", json={"email": self.email}
+            )
+
+        log_output = "\n".join(captured.output)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": FORGOT_PASSWORD_MESSAGE})
+        self.assertNotIn(self.email, response.text + log_output)
+        self.assertNotIn("private provider response", response.text + log_output)
+        self.assertNotIn("reset-password?", response.text + log_output)
+        self.assertIn("EmailDeliveryError", log_output)
+
+    def test_missing_email_configuration_raises_controlled_error(self):
+        with patch.dict(os.environ, {"RESEND_API_KEY": ""}):
+            with self.assertRaises(email_service.EmailConfigurationError) as raised:
+                email_service.send_password_reset_email(
+                    self.email, "https://frontend.example/reset-password"
+                )
+
+        self.assertEqual(
+            str(raised.exception),
+            "El servicio de correo no está configurado.",
+        )
+        self.assertNotIn("RESEND_API_KEY", str(raised.exception))
 
     def test_reset_email_has_mobile_html_and_plain_text_content(self):
         reset_url = "https://frontend.example/reset-password?token=sample-token"

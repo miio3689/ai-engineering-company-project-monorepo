@@ -27,7 +27,7 @@ const { AuthError, changePassword, forgotPassword, login, register, resetPasswor
 const { validateAuthForm } = await import("../lib/auth-form-validation.ts");
 const { fetchSuppliers, createSupplier, updateSupplierRate, updateSupplierStatus } = await import("../services/suppliers.ts");
 const { analyzeIncidentCsv, downloadIncidentAnalysisCsv } = await import("../services/incident-analysis.ts");
-const { fetchCandidates, fetchCandidateById } = await import("../services/api.ts");
+const { fetchCandidates, fetchCandidateById, createCandidate } = await import("../services/api.ts");
 const { fetchAccount, updateProfile } = await import("../services/account.ts");
 
 const originalFetch = globalThis.fetch;
@@ -198,7 +198,12 @@ test("duplicate email and FastAPI 422 errors map to individual fields", async ()
 
 test("server failures and malformed tokens do not become successful logins", async () => {
   respond({}, 503);
-  await assert.rejects(login({ email: "test@example.com", password: "secret" }), /HTTP 503/);
+  await assert.rejects(
+    login({ email: "test@example.com", password: "secret" }),
+    (error) => error instanceof AuthError
+      && error.message === "No se pudo iniciar sesión. El servicio no está disponible, inténtalo más tarde."
+      && !error.message.includes("503"),
+  );
   for (const token of [{}, { access_token: "", token_type: "bearer" }, { access_token: "token", token_type: "other" }]) {
     respond(token);
     await assert.rejects(login({ email: "test@example.com", password: "secret" }), /token válido/);
@@ -220,11 +225,35 @@ test("email, password and conditional profile validation match the backend", () 
 test("all existing service surfaces use the shared token client", async () => {
   browser("shared-token");
   const paths = [];
+  const supplier = {
+    id: 1,
+    name: "Proveedor de prueba",
+    country: "USA",
+    categories: ["carne"],
+    rate_per_unit: 10,
+    currency: "USD",
+    updated_at: "2026-01-01T00:00:00Z",
+    status: "active",
+    contact_email: null,
+    notes: null,
+  };
   globalThis.fetch = async (url, options) => {
     assert.equal(options.headers.get("Authorization"), "Bearer shared-token");
     paths.push(url);
     if (url.endsWith("/records")) return Response.json({ data: [] });
     if (url.endsWith("/records/missing")) return Response.json({}, { status: 404 });
+    if (url.endsWith("/api/incidents/analyze")) {
+      return Response.json({
+        total_records: 0,
+        valid_records: 0,
+        invalid_records: 0,
+        invalid_by_rule: {},
+        category_counts: {},
+        status_counts: {},
+        satisfaction: { average: null, scored_cases: 0, counts: {} },
+      });
+    }
+    if (url.includes("/suppliers") && options.method && options.method !== "GET") return Response.json(supplier);
     return Response.json([]);
   };
   await fetchCandidates();
@@ -236,6 +265,31 @@ test("all existing service surfaces use the shared token client", async () => {
   await analyzeIncidentCsv(new File(["csv"], "test.csv"));
   assert.equal(paths.length, 7);
   assert.ok(paths.some((path) => path.endsWith("/suppliers?country=USA&category=carne")));
+  globalThis.fetch = async () => new Response("<html>Unavailable</html>");
+  await assert.rejects(fetchCandidates(), /respuesta no válida/);
+  await assert.rejects(
+    createCandidate({
+      name: "Test",
+      email: "test@example.com",
+      phone: "123",
+      position: "Cocinero",
+      yearsOfExperience: 1,
+      status: "received",
+      stage: "pending",
+      appliedAt: "2026-01-01",
+    }),
+    /respuesta no válida/,
+  );
+  globalThis.fetch = async () => Response.json({ detail: "Revisa los datos enviados." }, { status: 422 });
+  await assert.rejects(fetchCandidates(), /Revisa los datos enviados/);
+  globalThis.fetch = async () => new Response("<html>Unavailable</html>", { status: 503 });
+  await assert.rejects(
+    fetchCandidates(),
+    (error) => error instanceof Error
+      && error.message === "El servicio no está disponible, inténtalo más tarde."
+      && !error.message.includes("503")
+      && !error.message.includes("<html>"),
+  );
 });
 
 test("incident downloads also clear the session on 401", async () => {
@@ -283,8 +337,8 @@ test("missing profile remains null and profile API failures are readable", async
   respond({ detail: [{ loc: ["body", "name"], msg: "invalid" }] }, 422);
   await assert.rejects(updateProfile(input), /Revisa el nombre/);
   respond({}, 503);
-  await assert.rejects(fetchAccount(), /cargar la cuenta \(HTTP 503\)/);
-  await assert.rejects(updateProfile(input), /guardar el perfil \(HTTP 503\)/);
+  await assert.rejects(fetchAccount(), /cargar la cuenta\. El servicio no está disponible/);
+  await assert.rejects(updateProfile(input), /guardar el perfil\. El servicio no está disponible/);
 });
 
 test("both account endpoints retain central 401 logout handling", async () => {

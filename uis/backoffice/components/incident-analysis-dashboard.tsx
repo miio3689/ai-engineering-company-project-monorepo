@@ -32,13 +32,13 @@ function BreakdownTable({ title, rows }: BreakdownTableProps) {
     <section className="incident-card incident-breakdown">
       <h2>{title}</h2>
       <ul>
-        {Object.entries(rows).map(([label, values]) => (
+        {Object.entries(rows ?? {}).map(([label, values]) => (
           <li key={label}>
             <span>{label.replaceAll("_", " ")}</span>
-            <strong>{values.count}</strong>
-            <span className="incident-percentage">{values.percentage.toFixed(1)}%</span>
+            <strong>{values?.count ?? 0}</strong>
+            <span className="incident-percentage">{(values?.percentage ?? 0).toFixed(1)}%</span>
             <span className="incident-bar-track" aria-hidden="true">
-              <span className="incident-bar" style={{ width: `${values.percentage}%` }} />
+              <span className="incident-bar" style={{ width: `${values?.percentage ?? 0}%` }} />
             </span>
           </li>
         ))}
@@ -48,32 +48,35 @@ function BreakdownTable({ title, rows }: BreakdownTableProps) {
 }
 
 function AnalysisResults({ analysis }: { analysis: IncidentAnalysisResponse }) {
+  const invalidRecords = analysis.invalid_records ?? 0;
+  const satisfactionAverage = analysis.satisfaction?.average ?? null;
+
   return (
     <div className="incident-results" aria-live="polite">
       <section className="incident-metrics" aria-label="Resumen del análisis">
         <article className="incident-card incident-metric">
           <span>Total de incidencias</span>
-          <strong>{analysis.total_records}</strong>
+          <strong>{analysis.total_records ?? 0}</strong>
         </article>
         <article className="incident-card incident-metric incident-metric-good">
           <span>Registros válidos</span>
-          <strong>{analysis.valid_records}</strong>
+          <strong>{analysis.valid_records ?? 0}</strong>
         </article>
         <article className="incident-card incident-metric incident-metric-warning">
           <span>Registros inválidos</span>
-          <strong>{analysis.invalid_records}</strong>
+          <strong>{invalidRecords}</strong>
         </article>
       </section>
 
-      {analysis.invalid_records > 0 && (
+      {invalidRecords > 0 && (
         <section className="incident-card incident-invalid" aria-label="Registros inválidos">
           <h2>Incidencias que requieren revisión</h2>
           <p>
-            Se encontraron <strong>{analysis.invalid_records}</strong> registros inválidos. El
+            Se encontraron <strong>{invalidRecords}</strong> registros inválidos. El
             desglose de reglas activadas es:
           </p>
           <ul>
-            {Object.entries(analysis.invalid_by_rule).map(([rule, count]) => (
+            {Object.entries(analysis.invalid_by_rule ?? {}).map(([rule, count]) => (
               <li key={rule}>
                 <span>{ERROR_LABELS[rule] ?? rule.replaceAll("_", " ")}</span>
                 <strong>{count}</strong>
@@ -84,24 +87,24 @@ function AnalysisResults({ analysis }: { analysis: IncidentAnalysisResponse }) {
       )}
 
       <div className="incident-breakdown-grid">
-        <BreakdownTable title="Incidencias por categoría" rows={analysis.category_counts} />
-        <BreakdownTable title="Incidencias por estado" rows={analysis.status_counts} />
+        <BreakdownTable title="Incidencias por categoría" rows={analysis.category_counts ?? {}} />
+        <BreakdownTable title="Incidencias por estado" rows={analysis.status_counts ?? {}} />
       </div>
 
       <section className="incident-card incident-satisfaction">
         <div className="incident-section-heading">
           <div>
             <h2>Índice de satisfacción</h2>
-            <p>{analysis.satisfaction.scored_cases} respuestas de casos cerrados</p>
+            <p>{analysis.satisfaction?.scored_cases ?? 0} respuestas de casos cerrados</p>
           </div>
           <strong className="incident-average">
-            {analysis.satisfaction.average === null
+            {satisfactionAverage === null
               ? "—"
-              : `${analysis.satisfaction.average.toFixed(2)} / 5`}
+              : `${satisfactionAverage.toFixed(2)} / 5`}
           </strong>
         </div>
         <ul>
-          {Object.entries(analysis.satisfaction.counts).map(([score, count]) => (
+          {Object.entries(analysis.satisfaction?.counts ?? {}).map(([score, count]) => (
             <li key={score}>
               <span className="incident-score">{score}</span>
               <span>{SATISFACTION_LABELS[score] ?? `Puntuación ${score}`}</span>
@@ -191,7 +194,18 @@ export default function IncidentAnalysisDashboard() {
             Analizando incidencias…
           </p>
         )}
-        {error && <p className="incident-error" role="alert">{error}</p>}
+        {error && (
+          <div className="incident-error" role="alert">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() => analysis ? void download() : inputRef.current?.click()}
+              disabled={isAnalyzing || isDownloading}
+            >
+              {analysis ? "Reintentar descarga" : "Seleccionar otro archivo"}
+            </button>
+          </div>
+        )}
       </section>
 
       {analysis && (

@@ -1,5 +1,22 @@
-import type { Supplier, SupplierFilters, SupplierInput, SupplierStatus } from "@/types/supplier";
+import {
+  SUPPLIER_CATEGORIES,
+  SUPPLIER_COUNTRIES,
+  SupplierStatus,
+  type Supplier,
+  type SupplierFilters,
+  type SupplierInput,
+} from "@/types/supplier";
 import { apiRequest } from "@/services/api-client";
+import {
+  API_UNAVAILABLE_MESSAGE,
+  INVALID_API_RESPONSE_MESSAGE,
+  buildApiErrorMessage,
+  readJsonResponse,
+} from "@/services/api-errors";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 export async function fetchSuppliers(
   filters: SupplierFilters = {},
@@ -15,10 +32,31 @@ export async function fetchSuppliers(
   );
 
   if (!response.ok) {
-    throw new Error(`No se pudo cargar el directorio de proveedores (HTTP ${response.status}).`);
+    throw new Error(await buildApiErrorMessage(response));
   }
 
-  return (await response.json()) as Supplier[];
+  const suppliers = await readJsonResponse<unknown>(response);
+  if (!Array.isArray(suppliers) || !suppliers.every(isSupplier)) {
+    throw new Error(INVALID_API_RESPONSE_MESSAGE);
+  }
+  return suppliers;
+}
+
+function isSupplier(value: unknown): value is Supplier {
+  if (!isRecord(value)) return false;
+  return typeof value.id === "number"
+    && typeof value.name === "string"
+    && SUPPLIER_COUNTRIES.some((country) => country === value.country)
+    && Array.isArray(value.categories)
+    && value.categories.every((category) =>
+      SUPPLIER_CATEGORIES.some((allowed) => allowed === category)
+    )
+    && typeof value.rate_per_unit === "number"
+    && (value.currency === "COP" || value.currency === "USD")
+    && (value.status === SupplierStatus.Active || value.status === SupplierStatus.Suspended)
+    && typeof value.updated_at === "string"
+    && (typeof value.contact_email === "string" || value.contact_email === null)
+    && (typeof value.notes === "string" || value.notes === null);
 }
 
 function validationMessage(detail: unknown): string {
@@ -52,6 +90,21 @@ function validationMessage(detail: unknown): string {
   return "Revisa los datos del proveedor.";
 }
 
+function supplierErrorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== "object") {
+    return "Revisa los datos del proveedor.";
+  }
+  if ("errors" in payload && Array.isArray(payload.errors)) {
+    const messages = payload.errors.flatMap((issue: unknown) => {
+      if (!issue || typeof issue !== "object" || !("message" in issue)) return [];
+      return typeof issue.message === "string" ? [validationMessage(issue.message)] : [];
+    });
+    if (messages.length) return messages.join(" ");
+  }
+  if ("detail" in payload) return validationMessage(payload.detail);
+  return "Revisa los datos del proveedor.";
+}
+
 async function writeSupplier(path: string, method: "POST" | "PATCH", body: object): Promise<Supplier> {
   const response = await apiRequest(`/suppliers${path}`, {
     method,
@@ -59,21 +112,21 @@ async function writeSupplier(path: string, method: "POST" | "PATCH", body: objec
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    const text = await response.text();
-    let payload: unknown;
-    try {
-      payload = JSON.parse(text);
-    } catch (error) {
-      if (!(error instanceof SyntaxError)) throw error;
-      throw new Error(`No se pudo guardar el proveedor (HTTP ${response.status}).`);
-    }
-    if (response.status === 422 && payload && typeof payload === "object" && "detail" in payload) {
-      throw new Error(validationMessage(payload.detail));
+    if (response.status === 400 || response.status === 422) {
+      let payload: unknown;
+      try {
+        payload = await readJsonResponse<unknown>(response);
+      } catch {
+        throw new Error("Los datos no son válidos. Revísalos e inténtalo de nuevo.");
+      }
+      throw new Error(supplierErrorMessage(payload));
     }
     if (response.status === 404) throw new Error("El proveedor ya no existe. Vuelve a cargar el listado.");
-    throw new Error(`No se pudo guardar el proveedor (HTTP ${response.status}).`);
+    throw new Error(`No se pudo guardar el proveedor. ${API_UNAVAILABLE_MESSAGE}`);
   }
-  return (await response.json()) as Supplier;
+  const supplier = await readJsonResponse<unknown>(response);
+  if (!isSupplier(supplier)) throw new Error(INVALID_API_RESPONSE_MESSAGE);
+  return supplier;
 }
 
 export function createSupplier(input: SupplierInput): Promise<Supplier> {

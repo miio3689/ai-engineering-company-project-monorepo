@@ -281,3 +281,43 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
 - Existing CORS remains unchanged and does not permit cross-origin PATCH or
   DELETE. TinyDB writes require a single API worker and no concurrent seeder.
 - No commit made for this task.
+
+## Auditoría de gestión de errores
+
+- **Frontend:** los errores de API se traducen a mensajes legibles sin códigos
+  HTTP ni respuestas crudas; `response.json()` está protegido. Las páginas de
+  servidor muestran error local con reintento en vez de caer al error genérico.
+  Las cargas usan `try/catch/finally`, estados de carga/éxito/error y fallbacks
+  con optional chaining. `app/error.tsx` no muestra `error.message` y ofrece
+  reintento, enlace al inicio y contacto de soporte. No cambiaron el logout
+  ante 401, los errores 422 por campo de autenticación ni el mensaje fijo de
+  forgot-password.
+- **Backend:** Resend distingue errores de configuración y entrega. La
+  recuperación de contraseña y el análisis CSV manejan errores en ámbitos
+  acotados; el registro revierte el usuario si falla el perfil y responde con
+  500 genérico. Un manejador global devuelve JSON limpio para errores no
+  controlados. Los logs no incluyen tracebacks ni datos sensibles. Se conservan
+  el 422 de autenticación, el 400 de incidencias, `{detail}` en analyze y el
+  200 genérico de forgot-password.
+- **Scripts:** `analyze.py` y `seed_incidents.py` controlan lectura y parseo de
+  CSV; `analyze.py` también controla la escritura. Los errores críticos se
+  comunican por `stderr` y terminan con código distinto de cero; se validan
+  argumentos, cabeceras y columnas. El seed de proveedores (`services/api/seed.py`)
+  y `promote_admin.py` también controlan fallos de validación y persistencia.
+- **Validaciones automatizadas:** 87 pruebas de backend pasan; también pasan
+  las 18 pruebas de `test:auth`, typecheck, lint y build.
+- **Verificación manual informada por la desarrolladora:** en navegador y
+  terminal se probaron errores de carga/reintento, backend detenido, login
+  incorrecto, registro con email repetido, sesión caducada, analizador con
+  archivo no CSV y recuperación de contraseña; errores por campo de registro,
+  recepción de correo real de recuperación, análisis del CSV real y creación
+  de incidencia; archivo inexistente con salida no cero, CSV real y seed
+  idempotente. Esta sesión no ejecutó el navegador ni una entrega real con
+  Resend.
+- **Limitaciones:** el `404` preexistente de `/` (Talent Pipeline Tracker, sin
+  backend de `/records`) sigue mostrando un panel de error legible con
+  reintento. No se pudo comprobar si Resend permite fijar un timeout y no se
+  añadió. Algunos detalles 409/422 ahora son genéricos. La denegación de
+  permisos de archivos se simuló; no se probó el camino exitoso de
+  `pandas_clean.py` porque Pandas no está instalado. TinyDB puede dejar una
+  escritura parcial si falla a mitad de una importación.

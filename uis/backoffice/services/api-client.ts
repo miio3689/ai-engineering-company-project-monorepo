@@ -1,3 +1,5 @@
+import { API_CONNECTION_MESSAGE, API_UNAVAILABLE_MESSAGE } from "@/services/api-errors";
+
 export const ACCESS_TOKEN_KEY = "access_token";
 
 export async function apiRequest(
@@ -6,19 +8,30 @@ export async function apiRequest(
   { authenticated = true }: { authenticated?: boolean } = {},
 ): Promise<Response> {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!baseUrl) throw new Error("Falta NEXT_PUBLIC_API_BASE_URL en el entorno.");
+  if (!baseUrl) throw new Error(API_UNAVAILABLE_MESSAGE);
 
   const headers = new Headers(options.headers);
   if (authenticated && typeof window !== "undefined") {
-    const token = window.localStorage.getItem(ACCESS_TOKEN_KEY);
+    let token: string | null;
+    try {
+      token = window.localStorage.getItem(ACCESS_TOKEN_KEY);
+    } catch {
+      throw new Error("No se pudo comprobar la sesión. Permite el almacenamiento local e inténtalo de nuevo.");
+    }
     if (token) headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}${path}`, {
-    cache: "no-store",
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl.replace(/\/$/, "")}${path}`, {
+      cache: "no-store",
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    throw new Error(API_CONNECTION_MESSAGE);
+  }
 
   if (authenticated && response.status === 401) {
     if (typeof window !== "undefined") {

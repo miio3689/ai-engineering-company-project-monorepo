@@ -26,29 +26,29 @@ export default function SupplierDirectory() {
   const [category, setCategory] = useState<SupplierCategory>();
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<DirectoryResult | null>(null);
+  const [requestLoading, setRequestLoading] = useState(true);
   const key = JSON.stringify([country, category, attempt]);
-  const loading = result?.key !== key;
+  const loading = requestLoading || result?.key !== key;
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchSuppliers({ country, category }, controller.signal)
-      .then((suppliers) => {
+    async function loadSuppliers() {
+      try {
+        const suppliers = await fetchSuppliers({ country, category }, controller.signal);
         if (!controller.signal.aborted) {
           setResult({ key, suppliers, error: null });
         }
-      })
-      .catch((error: unknown) => {
+      } catch (error: unknown) {
         if (!controller.signal.aborted) {
           const message = error instanceof Error ? error.message : "Error inesperado al cargar proveedores.";
-          setResult({
-            key,
-            suppliers: [],
-            error: message.includes("Failed to fetch")
-              ? "No se pudo conectar con la API. Comprueba la conexión e inténtalo de nuevo."
-              : message,
-          });
+          setResult({ key, suppliers: [], error: message });
         }
-      });
+      } finally {
+        if (!controller.signal.aborted) setRequestLoading(false);
+      }
+    }
+
+    void loadSuppliers();
     return () => controller.abort();
   }, [country, category, key]);
 
@@ -60,7 +60,7 @@ export default function SupplierDirectory() {
     setResult((current) => {
       if (!current || current.key !== key) return current;
       const matches = (!country || supplier.country === country)
-        && (!category || supplier.categories.includes(category));
+        && (!category || (supplier.categories ?? []).includes(category));
       const exists = current.suppliers.some((value) => value.id === supplier.id);
       return {
         ...current,
@@ -124,10 +124,10 @@ export default function SupplierDirectory() {
             </button>
           </div>
         )}
-        {!loading && !result?.error && result?.suppliers.length === 0 && (
+        {!loading && !result?.error && (result?.suppliers?.length ?? 0) === 0 && (
           <p>No hay proveedores que coincidan con los filtros seleccionados.</p>
         )}
-        {!loading && !result?.error && Boolean(result?.suppliers.length) && (
+        {!loading && !result?.error && Boolean(result?.suppliers?.length) && (
           <div className="overflow-x-auto rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2" tabIndex={0} role="region" aria-label="Tabla de proveedores; desplaza horizontalmente en pantallas pequeñas">
             <table className="w-full min-w-[640px] text-left text-sm">
               <caption className="sr-only">Proveedores con los filtros seleccionados</caption>
@@ -139,17 +139,22 @@ export default function SupplierDirectory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {result?.suppliers.map((supplier) => (
+                {(result?.suppliers ?? []).map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-orange-50">
-                    <th scope="row" className="px-3 py-4 font-semibold">{supplier.name}</th>
-                    <td className="px-3 py-4">{supplier.country}</td>
-                    <td className="px-3 py-4">{supplier.categories.map((value) => SUPPLIER_CATEGORY_LABELS[value]).join(", ")}</td>
+                    <th scope="row" className="px-3 py-4 font-semibold">{supplier.name ?? "Proveedor no disponible"}</th>
+                    <td className="px-3 py-4">{supplier.country ?? "País no disponible"}</td>
+                    <td className="px-3 py-4">
+                      {(supplier.categories ?? []).map((value) => SUPPLIER_CATEGORY_LABELS[value] ?? value).join(", ") || "Sin categorías"}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-4 tabular-nums">
-                      {new Intl.NumberFormat("es-CO", { style: "currency", currency: supplier.currency, currencyDisplay: "code" }).format(supplier.rate_per_unit)}
+                      {(supplier.currency === "COP" || supplier.currency === "USD")
+                        && Number.isFinite(supplier.rate_per_unit)
+                        ? new Intl.NumberFormat("es-CO", { style: "currency", currency: supplier.currency, currencyDisplay: "code" }).format(supplier.rate_per_unit)
+                        : "Tarifa no disponible"}
                     </td>
                     <td className="px-3 py-4">
                       <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${supplier.status === SupplierStatus.Active ? "bg-green-100 text-green-900" : "bg-gray-200 text-gray-800"}`}>
-                        {supplier.status === SupplierStatus.Active ? "Activo" : "Suspendido"}
+                        {supplier.status === SupplierStatus.Active ? "Activo" : supplier.status === SupplierStatus.Suspended ? "Suspendido" : "Estado no disponible"}
                       </span>
                     </td>
                     <td className="px-3 py-4">
