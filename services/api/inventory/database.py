@@ -5,6 +5,7 @@ import os
 from collections.abc import Iterator
 
 from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, SQLModel, create_engine
 
 from . import models  # noqa: F401
@@ -36,8 +37,20 @@ def get_engine():
 
 def get_db() -> Iterator[Session]:
     """Yield one SQLModel session per request and close it afterward."""
-    with Session(get_engine()) as session:
-        yield session
+    try:
+        with Session(get_engine()) as session:
+            yield session
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        logger.error(
+            "Inventory database error (type: %s).",
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Servicio de inventario no disponible.",
+        ) from exc
 
 
 def init_inventory_db() -> None:

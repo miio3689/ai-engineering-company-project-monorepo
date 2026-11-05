@@ -25,6 +25,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 from scripts.analyze import calculate_metrics, results_rows, validate_record  # noqa: E402,F401
 from services.api.routes.auth import router as auth_router  # noqa: E402
 from services.api.routes.incidents import router as incidents_router  # noqa: E402
+from services.api.routes.inventory import router as inventory_router  # noqa: E402
 from services.api.routes.profiles import router as profiles_router  # noqa: E402
 from services.api.routes.suppliers import router as suppliers_router  # noqa: E402
 from services.api.routes.users import router as users_router  # noqa: E402
@@ -66,6 +67,7 @@ app = FastAPI(
 )
 app.include_router(suppliers_router)
 app.include_router(incidents_router)
+app.include_router(inventory_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(profiles_router)
