@@ -168,6 +168,77 @@ The original eight supplier/incident regression tests and their assertions
 remain unchanged. Admin fixtures are created through `services_auth.crear_usuario`,
 never through public registration.
 
+## Hito 5: inventario con SQLModel y Supabase
+
+### Configurar la conexión
+
+En Supabase, abre **Connect > Direct > Transaction pooler > URI** y usa la URI
+del Transaction pooler, que utiliza el puerto `6543`. Configura esa URI como
+`DATABASE_URL` en `services/api/.env`:
+
+```dotenv
+DATABASE_URL=postgresql://demo_user:FAKE_PASSWORD@demo-project.pooler.supabase.example:6543/postgres
+```
+
+El usuario, la contraseña y el host del ejemplo son ficticios y no permiten
+conectarse. Sustitúyelos únicamente en tu entorno local o gestor de secretos.
+Codifica con URL-encoding los caracteres especiales que aparezcan en usuario,
+contraseña o URI (por ejemplo, `@` como `%40`). No subas `services/api/.env` a
+Git ni compartas una URI real en código, logs, tests o documentación.
+
+Sin `DATABASE_URL`, la aplicación arranca, pero los endpoints de inventario
+responden `503` con un mensaje genérico.
+
+### Sembrar inventario
+
+Desde la raíz del monorepo:
+
+```bash
+uv run python -m services.api.seed_inventory
+```
+
+El comando inserta ingredientes, entradas y salidas en una sola transacción.
+Es idempotente: si ya encuentra cualquiera de los SKU de la semilla, no inserta
+ningún dato y avisa que ya estaba sembrada. Requiere `DATABASE_URL` y al menos
+un usuario activo existente en TinyDB; no crea usuarios.
+
+### Endpoints
+
+Todos los endpoints requieren autenticación Bearer.
+
+| Método y ruta | Resultado principal |
+| --- | --- |
+| `GET /inventory/products` | Lista ingredientes con stock neto calculado. |
+| `POST /inventory/products` | Crea ingrediente; `201`, `409` si el SKU ya existe. |
+| `GET /inventory/products/{id}` | Ingrediente y stock neto; `404` si no existe. |
+| `POST /inventory/orders/inbound` | Registra una entrada; `201`, `404` si no existe el ingrediente. |
+| `POST /inventory/orders/outbound` | Registra consumo o merma; `201`, `400` si el stock no alcanza. |
+| `GET /inventory/orders` | Lista entradas y salidas con sus datos de ingrediente. |
+
+El stock es la suma de entradas menos la suma de salidas y no se almacena como
+columna. Una salida que excede el disponible responde `400` con este `detail`
+exacto (los valores se redondean a tres decimales):
+
+```text
+Insufficient stock for ingredient '{name}'. Available: {available}, requested: {requested}.
+```
+
+### Nombres de archivos y limitaciones
+
+| Nombre del enunciado | Archivo del proyecto |
+| --- | --- |
+| `models.py` ORM | `services/api/inventory/models.py` |
+| `schemas.py` Pydantic | `services/api/inventory/schemas.py` |
+| `database.py` inventario | `services/api/inventory/database.py`; el TinyDB existente permanece intacto. |
+| `routers/inventory.py` | `services/api/routes/inventory.py` |
+
+`SQLModel.metadata.create_all()` crea tablas ausentes, pero no sustituye un
+sistema de migraciones. El stock usa `float` y se redondea a tres decimales.
+La salida bloquea la fila del ingrediente con `with_for_update()` en PostgreSQL;
+SQLite no aplica ese bloqueo y no se ha validado concurrencia real. `user_uuid`
+es `str(id)` de un usuario de TinyDB, no un UUID estándar; si TinyDB reutiliza
+el ID de una cuenta eliminada, ese valor podría volver a aparecer.
+
 ## AUTH-03: password reset email configuration
 
 - `RESEND_API_KEY`: Resend API key; required to deliver password reset emails

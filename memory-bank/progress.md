@@ -284,7 +284,6 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
 
 ## Auditoría de gestión de errores
 
-- **Frontend:** los errores de API se traducen a mensajes legibles sin códigos
   HTTP ni respuestas crudas; `response.json()` está protegido. Las páginas de
   servidor muestran error local con reintento en vez de caer al error genérico.
   Las cargas usan `try/catch/finally`, estados de carga/éxito/error y fallbacks
@@ -292,21 +291,17 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   reintento, enlace al inicio y contacto de soporte. No cambiaron el logout
   ante 401, los errores 422 por campo de autenticación ni el mensaje fijo de
   forgot-password.
-- **Backend:** Resend distingue errores de configuración y entrega. La
   recuperación de contraseña y el análisis CSV manejan errores en ámbitos
   acotados; el registro revierte el usuario si falla el perfil y responde con
   500 genérico. Un manejador global devuelve JSON limpio para errores no
   controlados. Los logs no incluyen tracebacks ni datos sensibles. Se conservan
   el 422 de autenticación, el 400 de incidencias, `{detail}` en analyze y el
   200 genérico de forgot-password.
-- **Scripts:** `analyze.py` y `seed_incidents.py` controlan lectura y parseo de
   CSV; `analyze.py` también controla la escritura. Los errores críticos se
   comunican por `stderr` y terminan con código distinto de cero; se validan
   argumentos, cabeceras y columnas. El seed de proveedores (`services/api/seed.py`)
   y `promote_admin.py` también controlan fallos de validación y persistencia.
-- **Validaciones automatizadas:** 87 pruebas de backend pasan; también pasan
   las 18 pruebas de `test:auth`, typecheck, lint y build.
-- **Verificación manual informada por la desarrolladora:** en navegador y
   terminal se probaron errores de carga/reintento, backend detenido, login
   incorrecto, registro con email repetido, sesión caducada, analizador con
   archivo no CSV y recuperación de contraseña; errores por campo de registro,
@@ -314,10 +309,36 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   de incidencia; archivo inexistente con salida no cero, CSV real y seed
   idempotente. Esta sesión no ejecutó el navegador ni una entrega real con
   Resend.
-- **Limitaciones:** el `404` preexistente de `/` (Talent Pipeline Tracker, sin
   backend de `/records`) sigue mostrando un panel de error legible con
   reintento. No se pudo comprobar si Resend permite fijar un timeout y no se
   añadió. Algunos detalles 409/422 ahora son genéricos. La denegación de
   permisos de archivos se simuló; no se probó el camino exitoso de
   `pandas_clean.py` porque Pandas no está instalado. TinyDB puede dejar una
   escritura parcial si falla a mitad de una importación.
+
+## Hito 5 - Inventario con SQLModel y doble base de datos
+
+- Según lo informado por el desarrollador, las fases 1 a 4 fueron aprobadas y
+  commiteadas. La fase 1 añadió la conexión SQLModel opcional sin reemplazar
+  TinyDB; la fase 2 separó modelos ORM y schemas; la fase 3 añadió rutas
+  autenticadas y reglas de stock; la fase 4 añadió la semilla transaccional e
+  idempotente.
+- El desarrollador ejecutó manualmente desde la raíz
+  `uv run python -m services.api.seed_inventory` contra Supabase y confirmó
+  que funciona. Esta sesión no realizó esa conexión.
+- Las pruebas locales usan SQLite en memoria y TinyDB temporal. La última suite
+  completa de backend registrada pasó 113 pruebas. La semilla crea 6
+  ingredientes, 7 entradas y 3 salidas; el segundo intento no duplica datos y
+  el endpoint de productos devuelve los stocks netos esperados.
+- No se ha comprobado concurrencia real ni el bloqueo `with_for_update()` en
+  PostgreSQL desde esta sesión; SQLite no aplica ese bloqueo. Tampoco se
+  hicieron mediciones de rendimiento o carga.
+- `create_all()` no es un sistema de migraciones. El stock usa `float` con
+  redondeo a tres decimales. `user_uuid` es el ID entero de TinyDB convertido a
+  texto y TinyDB puede reutilizar IDs de usuarios eliminados. Sin
+  `DATABASE_URL`, los endpoints de inventario responden `503`.
+- La fase 5 documentó la configuración, uso y limitaciones del inventario.
+  La suite completa de esta fase pasó 113 pruebas; `git diff --check` pasó,
+  `services/api/.env` está ignorado por Git y la búsqueda de URI PostgreSQL con
+  credenciales en archivos rastreados encontró únicamente el ejemplo
+  ficticio de `services/api/README.md`.
