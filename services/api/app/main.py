@@ -7,9 +7,10 @@ import io
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, AsyncIterator
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
@@ -24,10 +25,12 @@ if str(REPOSITORY_ROOT) not in sys.path:
 from scripts.analyze import calculate_metrics, results_rows, validate_record  # noqa: E402,F401
 from services.api.routes.auth import router as auth_router  # noqa: E402
 from services.api.routes.incidents import router as incidents_router  # noqa: E402
+from services.api.routes.inventory import router as inventory_router  # noqa: E402
 from services.api.routes.profiles import router as profiles_router  # noqa: E402
 from services.api.routes.suppliers import router as suppliers_router  # noqa: E402
 from services.api.routes.users import router as users_router  # noqa: E402
 from services.api.auth_security import get_current_user  # noqa: E402
+from services.api.inventory.database import init_inventory_db  # noqa: E402
 from services.api.models import UserResponse  # noqa: E402
 
 EXPECTED_COLUMNS = (
@@ -42,10 +45,29 @@ EXPECTED_COLUMNS = (
     "reporter_id",
 )
 
-app = FastAPI(title="Brasaland Incidents API", version="1.0.0")
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    try:
+        init_inventory_db()
+    except Exception as exc:
+        logger.error(
+            "Inventory database initialization failed (type: %s).",
+            type(exc).__name__,
+        )
+    yield
+
+
+app = FastAPI(
+    title="Brasaland Incidents API",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 app.include_router(suppliers_router)
 app.include_router(incidents_router)
+app.include_router(inventory_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(profiles_router)
