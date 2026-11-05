@@ -7,6 +7,8 @@ from collections.abc import Iterator
 from fastapi import HTTPException
 from sqlmodel import Session, SQLModel, create_engine
 
+from . import models  # noqa: F401
+
 logger = logging.getLogger(__name__)
 _engine = None
 
