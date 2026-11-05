@@ -342,3 +342,17 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   `services/api/.env` está ignorado por Git y la búsqueda de URI PostgreSQL con
   credenciales en archivos rastreados encontró únicamente el ejemplo
   ficticio de `services/api/README.md`.
+
+## Hito 5 - Backoffice de inventario
+
+- Implementadas las vistas de productos (`/inventory/products`), registro de
+  entrada (`/inventory/orders/inbound`), registro de salida
+  (`/inventory/orders/outbound`) e historial de órdenes (`/inventory/orders`).
+  `/inventory` redirige a la vista de productos.
+- La lista de productos indica nivel según unidad: `kg`/`litro`, bajo < 20 y
+  medio < 50; `unidad`, bajo < 50 y medio < 150. La salida advierte sobre
+  stock insuficiente sin bloquear el envío; la API aplica la regla definitiva.
+- Las cuatro vistas pasaron lint, typecheck y build; `test:auth` pasó sus 18
+  pruebas. El build se validó en una copia temporal que excluyó `.env*`.
+- El desarrollador realizó manualmente la comprobación visual del inventario
+  contra la API real.

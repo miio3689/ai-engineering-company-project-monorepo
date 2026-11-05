@@ -65,7 +65,7 @@ export default function InventoryProductsTable({
         <caption className="sr-only">Ingredientes y niveles de stock actuales</caption>
         <thead className="bg-gray-100 text-xs uppercase text-gray-700">
           <tr>
-            <th scope="col" className="px-4 py-3">Nombre</th>
+            <th scope="col" className="px-4 py-3">Ingrediente</th>
             <th scope="col" className="px-4 py-3">SKU</th>
             <th scope="col" className="px-4 py-3">Categoría</th>
             <th scope="col" className="px-4 py-3">País</th>
