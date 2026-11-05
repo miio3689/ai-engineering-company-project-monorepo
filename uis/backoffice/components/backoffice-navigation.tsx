@@ -12,6 +12,7 @@ const links = [
   { href: "/incidents", label: "Incidencias" },
   { href: "/incidents/list", label: "Gestor de incidencias" },
   { href: "/suppliers", label: "Proveedores" },
+  { href: "/inventory/products", label: "Inventario" },
   { href: "/account/profile", label: "Mi perfil" },
   { href: "/account/change-password", label: "Cambiar contraseña" },
 ];
@@ -37,7 +38,7 @@ export default function BackofficeNavigation() {
     <header className="border-b border-gray-200 bg-white px-4 py-2 text-gray-800">
       <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1" aria-label="Navegación del backoffice">
         {links.map(({ href, label }) => (
-          <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className={linkClass}>{label}</Link>
+          <Link key={href} href={href} aria-current={pathname === href || (href === "/inventory/products" && pathname.startsWith("/inventory")) ? "page" : undefined} className={linkClass}>{label}</Link>
         ))}
         <button type="button" onClick={logout} className="min-h-11 rounded-lg border border-gray-400 px-3 focus-visible:outline-2 focus-visible:outline-offset-2 sm:ml-auto">Cerrar sesión</button>
       </nav>
