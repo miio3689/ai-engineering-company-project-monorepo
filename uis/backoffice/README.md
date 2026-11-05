@@ -140,6 +140,27 @@ estar permitido por CORS en la API. Esta variable se incorpora al código
 cliente al arrancar/compilar Next.js; reiniciar el frontend después de
 cambiarla.
 
+## Inventario
+
+El inventario reutiliza la configuración existente `NEXT_PUBLIC_API_BASE_URL`;
+no requiere una variable de URL nueva.
+
+- `/inventory` redirige a la lista de productos.
+- `/inventory/products` muestra ingredientes, categoría, país, unidad y stock
+  actual, con acceso a los formularios de movimiento.
+- `/inventory/orders/inbound` registra una entrada con ingrediente, cantidad,
+  proveedor y local.
+- `/inventory/orders/outbound` registra una salida por consumo o merma, con el
+  stock disponible y su nivel antes del envío.
+- `/inventory/orders` presenta el historial de entradas y salidas en modo de
+  solo lectura.
+
+Los niveles de stock se calculan por unidad: para `kg` y `litro`, bajo es menor
+que 20 y medio es menor que 50; para `unidad`, bajo es menor que 50 y medio es
+menor que 150. Los valores desde el umbral medio superior se consideran
+saludables. La advertencia de stock insuficiente en el formulario de salida no
+bloquea el envío: la API aplica la regla definitiva y puede rechazarlo.
+
 ## Gestor de incidencias
 
 La ruta existente `/incidents` sigue siendo el analizador CSV. El gestor nuevo
