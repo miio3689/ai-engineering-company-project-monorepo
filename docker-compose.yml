@@ -34,6 +34,9 @@ services:
     build:
       context: ./uis
       dockerfile: Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
     ports:
       - "${BACKOFFICE_PORT:-3000}:3000"
       - "${WEBSITE_PORT:-5174}:5174"
@@ -41,6 +44,7 @@ services:
       - path: ${UIS_ENV_FILE:-./.env}
         required: false
     environment:
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8000}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
       VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-}
       WATCHPACK_POLLING: ${WATCH_POLLING:-true}
