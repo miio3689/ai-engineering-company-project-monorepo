@@ -367,3 +367,34 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
 - La configuración Compose local confirma website `3000→5174`, backoffice
   `3001→3000` y API `8000→8000`. Pendiente: reverificar estos puertos en el VPS
   y abrir el PR; la fase 5 no se marca como validada.
+
+## Hito 5 - Corrección de stock por local
+
+- `GET /inventory/products` y `GET /inventory/products/{id}` devuelven
+  `stock_by_location`, calculado mediante agregaciones agrupadas de entradas y
+  salidas por ingrediente y local; `current_stock` conserva el total global.
+- Las salidas se validan contra el disponible del local indicado, conservando
+  el bloqueo de la fila del ingrediente, el redondeo a tres decimales y HTTP
+  `400` con el nombre y local cuando no alcanza el stock.
+- Las pruebas cubren lecturas multi-locales, ingredientes sin movimientos,
+  listados de varios ingredientes, rechazo de salida en un local sin entradas,
+  disponibilidad local, exceso frente al total global y agotamiento exacto.
+- Validación: `uv run python -m unittest discover -s services/api/tests -t . -v`
+  pasó las 120 pruebas. La suite enfocada de inventario pasó 19 pruebas.
+- No se modificaron modelos de tabla, semilla ni otros archivos fuera del
+  alcance de esta corrección.
+
+## Hito 5 - Frontend de stock por local
+
+- El listado de inventario permite seleccionar «Todos los locales» o uno de
+  los 14 locales. El stock y nivel visibles siguen ese filtro; cada ingrediente
+  despliega su stock por local o «Sin movimientos».
+- El formulario de salida muestra disponible, nivel y aviso de exceso para el
+  local seleccionado; sin local no presenta una disponibilidad ni advertencia.
+  El mensaje de éxito usa el stock actualizado del local de salida.
+- Se valida `stock_by_location` en las respuestas y se cubren la selección de
+  stock local/global, locales ausentes, payloads inválidos y aviso por local.
+- Validaciones ejecutadas: `npm run lint`, `npm run typecheck`,
+  `npm run test:auth` (18 pruebas), `node --test tests/inventory-stock.test.mjs`
+  (4 pruebas) y `npm run build` en una copia temporal que excluyó `.env*`.
+  Todas pasaron; el lint quedó sin avisos.

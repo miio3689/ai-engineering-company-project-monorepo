@@ -7,7 +7,9 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useInventoryIngredientStock } from "@/hooks/use-inventory-ingredient-stock";
 import { useInventoryProducts } from "@/hooks/use-inventory-products";
 import {
+  getLocationStock,
   getStockLevel,
+  isQuantityAboveLocationStock,
   STOCK_LEVEL_PRESENTATION,
 } from "@/lib/inventory-stock";
 import { createOutboundOrder, InventoryServiceError } from "@/services/inventory";
@@ -78,6 +80,7 @@ export default function InventoryOutboundForm() {
     (ingredient) => String(ingredient.id) === values.ingredientId,
   );
   const stock = useInventoryIngredientStock(selectedIngredient?.id ?? null);
+  const selectedLocationId = values.locationId ? Number(values.locationId) : null;
 
   useEffect(() => {
     const firstError = Object.keys(fieldErrors)[0] as InventoryFormField | undefined;
@@ -197,16 +200,21 @@ export default function InventoryOutboundForm() {
   }
 
   const quantity = Number(values.quantity);
-  const showStockWarning = selectedIngredient
-    && stock.ingredient
-    && !stock.loading
-    && !stock.error
-    && Number.isFinite(quantity)
-    && quantity > stock.ingredient.current_stock;
-  const stockPresentation = stock.ingredient
+  const showStockWarning = isQuantityAboveLocationStock(
+    stock.ingredient,
+    selectedLocationId,
+    quantity,
+  ) && !stock.loading && !stock.error;
+  const localStock = stock.ingredient && selectedLocationId !== null
+    ? getLocationStock(stock.ingredient, selectedLocationId)
+    : null;
+  const stockPresentation = stock.ingredient && localStock !== null
     ? STOCK_LEVEL_PRESENTATION[
-      getStockLevel(stock.ingredient.unit, stock.ingredient.current_stock)
+      getStockLevel(stock.ingredient.unit, localStock)
     ]
+    : null;
+  const successLocalStock = success && stock.ingredient
+    ? getLocationStock(stock.ingredient, success.locationId)
     : null;
 
   return (
@@ -367,10 +375,15 @@ export default function InventoryOutboundForm() {
                 Selecciona un ingrediente para ver su stock
               </p>
             )}
-            {selectedIngredient && stock.loading && (
+            {selectedIngredient && selectedLocationId === null && (
+              <p role="status" className="text-gray-700">
+                Selecciona un local para ver su stock en ese local
+              </p>
+            )}
+            {selectedIngredient && selectedLocationId !== null && stock.loading && (
               <p role="status" className="text-gray-700">Consultando stock…</p>
             )}
-            {selectedIngredient && stock.error && (
+            {selectedIngredient && selectedLocationId !== null && stock.error && (
               <div role="alert" className="grid gap-2 text-red-900">
                 <p>{stock.error}</p>
                 <button
@@ -382,10 +395,10 @@ export default function InventoryOutboundForm() {
                 </button>
               </div>
             )}
-            {selectedIngredient && stock.ingredient && stockPresentation && (
+            {selectedIngredient && stock.ingredient && localStock !== null && stockPresentation && (
               <p className="flex flex-wrap items-center gap-3 text-gray-800">
                 <span>
-                  Stock disponible: {quantityFormatter.format(stock.ingredient.current_stock)} {stock.ingredient.unit}
+                  Stock disponible en el Local {selectedLocationId}: {quantityFormatter.format(localStock)} {stock.ingredient.unit}
                 </span>
                 <span className={`inline-flex items-center gap-2 rounded px-2.5 py-1 text-sm font-semibold ${stockPresentation.className}`}>
                   <span aria-hidden="true">{stockPresentation.symbol}</span>
@@ -395,7 +408,7 @@ export default function InventoryOutboundForm() {
             )}
             {showStockWarning && stock.ingredient && (
               <p aria-live="polite" className="text-sm font-semibold text-amber-950">
-                La cantidad supera el stock disponible ({quantityFormatter.format(stock.ingredient.current_stock)} {stock.ingredient.unit}). La salida será rechazada.
+                La cantidad supera el stock disponible en el Local {selectedLocationId} ({quantityFormatter.format(localStock ?? 0)} {stock.ingredient.unit}). La salida será rechazada.
               </p>
             )}
           </div>
@@ -424,10 +437,10 @@ export default function InventoryOutboundForm() {
         {success && (
           <p role="status" className="mt-5 grid gap-2 rounded-lg border border-green-300 bg-green-50 p-4 text-green-950">
             <span>
-              Salida registrada: {quantityFormatter.format(success.quantity)} {formatQuantityUnit(success.quantity, success.unit)} de {success.ingredientName} ({EXIT_REASON_LABELS[success.reason]}, Local {success.locationId}). Stock disponible ahora: {stock.loading
+              Salida registrada: {quantityFormatter.format(success.quantity)} {formatQuantityUnit(success.quantity, success.unit)} de {success.ingredientName} ({EXIT_REASON_LABELS[success.reason]}, Local {success.locationId}). Stock disponible ahora en el Local {success.locationId}: {stock.loading
                 ? "Consultando..."
-                : stock.ingredient
-                  ? `${quantityFormatter.format(stock.ingredient.current_stock)} ${stock.ingredient.unit}`
+                : successLocalStock !== null && stock.ingredient
+                  ? `${quantityFormatter.format(successLocalStock)} ${stock.ingredient.unit}`
                   : "no disponible"}.
             </span>
             <Link

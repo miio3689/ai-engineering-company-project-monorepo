@@ -12,6 +12,7 @@ import type {
   IngredientUnit,
   InboundOrderInput,
   InventoryOrder,
+  LocationStock,
   OutboundOrderInput,
 } from "@/types/inventory";
 
@@ -38,6 +39,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isLocationStock(value: unknown): value is LocationStock {
+  return isRecord(value)
+    && typeof value.location_id === "number"
+    && Number.isInteger(value.location_id)
+    && typeof value.quantity === "number"
+    && Number.isFinite(value.quantity);
+}
+
 function isIngredient(value: unknown): value is Ingredient {
   return isRecord(value)
     && typeof value.id === "number"
@@ -51,7 +60,9 @@ function isIngredient(value: unknown): value is Ingredient {
     && typeof value.country === "string"
     && INGREDIENT_COUNTRIES.includes(value.country as IngredientCountry)
     && typeof value.current_stock === "number"
-    && Number.isFinite(value.current_stock);
+    && Number.isFinite(value.current_stock)
+    && Array.isArray(value.stock_by_location)
+    && value.stock_by_location.every(isLocationStock);
 }
 
 function isIngredientList(value: unknown): value is Ingredient[] {
