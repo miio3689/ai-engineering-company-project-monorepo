@@ -7,7 +7,11 @@ export async function apiRequest(
   options: RequestInit = {},
   { authenticated = true }: { authenticated?: boolean } = {},
 ): Promise<Response> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  // El servidor usa DNS de Compose; el navegador necesita la URL publicada.
+  const baseUrl =
+    typeof window === "undefined" && process.env.API_INTERNAL_URL
+      ? process.env.API_INTERNAL_URL
+      : process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!baseUrl) throw new Error(API_UNAVAILABLE_MESSAGE);
 
   const headers = new Headers(options.headers);

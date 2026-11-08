@@ -1,0 +1,87 @@
+services:
+  api:
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+      additional_contexts:
+        packages: ./packages
+        scripts: ./scripts
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: ${API_ENV_FILE:-./.env}
+        required: false
+    volumes:
+      - ./services:/app/services
+      - ./packages:/app/packages
+      - ./scripts:/app/scripts
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8000/docs', timeout=3).close()
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - brasaland
+
+  uis:
+    build:
+      context: ./uis
+      dockerfile: Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${BACKOFFICE_PORT:-3001}:3000"
+      - "${WEBSITE_PORT:-3000}:5174"
+    env_file:
+      - path: ${UIS_ENV_FILE:-./.env}
+        required: false
+    environment:
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8000}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+      VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-}
+      WATCHPACK_POLLING: ${WATCH_POLLING:-true}
+      CHOKIDAR_USEPOLLING: ${WATCH_POLLING:-true}
+    volumes:
+      - ./uis/website:/app/website
+      - ./uis/backoffice:/app/backoffice
+      - uis_website_node_modules:/app/website/node_modules
+      - uis_website_next:/app/website/.next
+      - uis_backoffice_node_modules:/app/backoffice/node_modules
+      - uis_backoffice_next:/app/backoffice/.next
+    command:
+      - sh
+      - -c
+      - |
+        (
+          cd /app/website
+          npm run dev -- --host 0.0.0.0 --port 5174 2>&1 | while IFS= read -r line; do printf '[website] %s\n' "$$line"; done
+        ) &
+        website_pid=$!
+        (
+          cd /app/backoffice
+          npm run dev -- --hostname 0.0.0.0 --port 3000 2>&1 | while IFS= read -r line; do printf '[backoffice] %s\n' "$$line"; done
+        ) &
+        backoffice_pid=$!
+        trap 'kill "$$website_pid" "$$backoffice_pid" 2>/dev/null || true' HUP INT TERM
+        wait
+    networks:
+      - brasaland
+
+networks:
+  brasaland:
+    name: brasaland
+    driver: bridge
+
+volumes:
+  uis_website_node_modules:
+  uis_website_next:
+  uis_backoffice_node_modules:
+  uis_backoffice_next:

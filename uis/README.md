@@ -7,4 +7,15 @@ Each subfolder inside `uis/` must correspond to **one specific user interface** 
 - **Main purpose**: to centralize in a single place all the frontend applications that support the company's use cases.
 - **Recommendation**: document in this file (or in sub-READMEs) the applications you add, their objective, the technology used, and how to run them.
 
+## Development container
+
+The Dockerfile runs the public Vite website on container port `5174` and the Next.js backoffice on container port `3000`. With the root Compose file, host ports map as website `3000 -> 5174` and backoffice `3001 -> 3000`; the container ports and `start.sh` remain unchanged.
+
+From `uis/`, build and run both interfaces with:
+
+```bash
+docker build -t brasaland-uis .
+docker run --rm -p 3000:5174 -p 3001:3000 brasaland-uis
+```
+
 > _Spanish version: [README.es.md](./README.es.md)._

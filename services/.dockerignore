@@ -1,0 +1,19 @@
+.env*
+**/.env*
+
+.git
+**/.git
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+
+api/auth.json
+api/incidents.json
+api/suppliers.json
+
+# Las pruebas no son necesarias para ejecutar el servicio en desarrollo.
+api/tests/
+
+**/*.log
+**/.coverage
+**/htmlcov/

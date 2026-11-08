@@ -356,3 +356,14 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   pruebas. El build se validó en una copia temporal que excluyó `.env*`.
 - El desarrollador realizó manualmente la comprobación visual del inventario
   contra la API real.
+
+## Ticket #infra-40 - Fase 5: documentación y puertos publicados
+
+- Fases 1 a 4 completadas, según las validaciones anteriores del ticket.
+- En el VPS se verificó la construcción de imágenes, la API en estado
+  `healthy`, el arranque de `uis` y la comunicación `uis` → `api` por nombre de
+  servicio: `wget http://api:8000/openapi.json` devolvió el JSON esperado.
+- Los logs del VPS no mostraron errores de inicialización de Supabase.
+- La configuración Compose local confirma website `3000→5174`, backoffice
+  `3001→3000` y API `8000→8000`. Pendiente: reverificar estos puertos en el VPS
+  y abrir el PR; la fase 5 no se marca como validada.
