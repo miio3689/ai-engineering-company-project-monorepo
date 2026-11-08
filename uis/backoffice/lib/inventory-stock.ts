@@ -1,4 +1,4 @@
-import type { IngredientUnit } from "@/types/inventory";
+import type { Ingredient, IngredientUnit } from "@/types/inventory";
 
 export type StockLevel = "low" | "medium" | "healthy";
 
@@ -34,4 +34,23 @@ export function getStockLevel(
   if (currentStock < lowThreshold) return "low";
   if (currentStock < healthyThreshold) return "medium";
   return "healthy";
+}
+
+export function getLocationStock(
+  ingredient: Ingredient,
+  locationId: number | null,
+): number {
+  if (locationId === null) return ingredient.current_stock;
+  return ingredient.stock_by_location.find((stock) => stock.location_id === locationId)?.quantity ?? 0;
+}
+
+export function isQuantityAboveLocationStock(
+  ingredient: Ingredient | null,
+  locationId: number | null,
+  quantity: number,
+): boolean {
+  return ingredient !== null
+    && locationId !== null
+    && Number.isFinite(quantity)
+    && quantity > getLocationStock(ingredient, locationId);
 }

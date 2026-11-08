@@ -9,6 +9,11 @@ export type IngredientCategory =
 export type IngredientCountry = "CO" | "US";
 export type ExitReason = "consumption" | "waste";
 
+export interface LocationStock {
+  location_id: number;
+  quantity: number;
+}
+
 export interface Ingredient {
   id: number;
   name: string;
@@ -17,6 +22,7 @@ export interface Ingredient {
   category: IngredientCategory;
   country: IngredientCountry;
   current_stock: number;
+  stock_by_location: LocationStock[];
 }
 
 interface InventoryOrderBase {

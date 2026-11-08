@@ -208,19 +208,44 @@ Todos los endpoints requieren autenticación Bearer.
 
 | Método y ruta | Resultado principal |
 | --- | --- |
-| `GET /inventory/products` | Lista ingredientes con stock neto calculado. |
+| `GET /inventory/products` | Lista ingredientes con stock total y desglose de stock por local. |
 | `POST /inventory/products` | Crea ingrediente; `201`, `409` si el SKU ya existe. |
-| `GET /inventory/products/{id}` | Ingrediente y stock neto; `404` si no existe. |
+| `GET /inventory/products/{id}` | Ingrediente, stock total y desglose por local; `404` si no existe. |
 | `POST /inventory/orders/inbound` | Registra una entrada; `201`, `404` si no existe el ingrediente. |
-| `POST /inventory/orders/outbound` | Registra consumo o merma; `201`, `400` si el stock no alcanza. |
+| `POST /inventory/orders/outbound` | Registra consumo o merma; `201`, `400` si el stock del local no alcanza. |
 | `GET /inventory/orders` | Lista entradas y salidas con sus datos de ingrediente. |
 
-El stock es la suma de entradas menos la suma de salidas y no se almacena como
-columna. Una salida que excede el disponible responde `400` con este `detail`
-exacto (los valores se redondean a tres decimales):
+`current_stock` es el stock total: entradas menos salidas en todos los locales.
+`stock_by_location` es una lista ordenada por `location_id`, calculada con
+entradas menos salidas de cada local. Solo incluye locales con movimientos;
+si una entrada y una salida se compensan, el local aparece con cantidad `0`.
+Un ingrediente sin movimientos y el `POST /inventory/products` devuelven una
+lista vacía. El stock se calcula al leer y no se almacena como columna.
+
+Ejemplo de respuesta de producto:
+
+```json
+{
+  "id": 1,
+  "name": "Falda de ternera",
+  "sku": "BRS-BEEF-001",
+  "unit": "kg",
+  "category": "meat",
+  "country": "CO",
+  "current_stock": 15.0,
+  "stock_by_location": [
+    { "location_id": 1, "quantity": 8.0 },
+    { "location_id": 2, "quantity": 7.0 }
+  ]
+}
+```
+
+Una salida solo puede consumir stock disponible en el mismo `location_id`;
+stock de otros locales no la habilita. La respuesta `400` incluye el local y
+los valores redondeados a tres decimales:
 
 ```text
-Insufficient stock for ingredient '{name}'. Available: {available}, requested: {requested}.
+Insufficient stock for ingredient 'Falda de ternera' at location 5. Available: 0.000, requested: 5.000.
 ```
 
 ### Nombres de archivos y limitaciones

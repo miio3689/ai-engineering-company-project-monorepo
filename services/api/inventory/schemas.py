@@ -30,6 +30,11 @@ class IngredientCreate(BaseModel):
         return value
 
 
+class LocationStockRead(BaseModel):
+    location_id: int
+    quantity: float
+
+
 class IngredientRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
@@ -40,6 +45,7 @@ class IngredientRead(BaseModel):
     category: IngredientCategory
     country: IngredientCountry
     current_stock: float
+    stock_by_location: list[LocationStockRead] = Field(default_factory=list)
 
 
 class EntryCreate(BaseModel):
