@@ -36,6 +36,28 @@ function Breakdown<T extends string>({
   );
 }
 
+function BreakdownSkeleton({ rowCount }: { rowCount: number }) {
+  return (
+    <section
+      aria-hidden="true"
+      className="min-w-0 rounded-xl border border-gray-200 bg-white p-4 sm:p-5"
+    >
+      <div className="mb-3 h-7 w-2/5 rounded bg-gray-200" />
+      <ul className="grid gap-2">
+        {Array.from({ length: rowCount }, (_, index) => (
+          <li
+            key={index}
+            className="flex min-h-10 items-center justify-between gap-3 border-b border-gray-100 py-2 last:border-0"
+          >
+            <span className="h-6 w-2/3 rounded bg-gray-200" />
+            <span className="h-6 w-6 shrink-0 rounded bg-gray-200" />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function IncidentSummary() {
   const { summary, loading, error, retry } = useIncidentSummary();
 
@@ -55,9 +77,25 @@ export default function IncidentSummary() {
       </header>
 
       {loading && (
-        <p role="status" className="rounded-xl border border-gray-200 bg-white p-4 text-gray-700">
-          Cargando resumen…
-        </p>
+        <>
+          <p role="status" className="sr-only">Cargando resumen…</p>
+          <article
+            aria-hidden="true"
+            className="rounded-2xl border border-orange-300 bg-white p-5 shadow-sm"
+          >
+            <div className="h-5 w-1/4 rounded bg-gray-200" />
+            <div className="mt-1 h-10 w-20 rounded bg-gray-200" />
+          </article>
+          <div
+            aria-hidden="true"
+            className="grid min-w-0 gap-4 md:grid-cols-2"
+          >
+            <BreakdownSkeleton rowCount={INCIDENT_STATUSES.length} />
+            <BreakdownSkeleton rowCount={INCIDENT_CATEGORIES.length} />
+            <BreakdownSkeleton rowCount={INCIDENT_ORIGINS.length} />
+            <BreakdownSkeleton rowCount={INCIDENT_BRANCHES.length} />
+          </div>
+        </>
       )}
 
       {!loading && error && (
