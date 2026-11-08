@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { useInventoryProducts } from "@/hooks/use-inventory-products";
+import { useSubmissionLock } from "@/hooks/use-submission-lock";
 import { createInboundOrder, InventoryServiceError } from "@/services/inventory";
 import { LOCATION_IDS, type InboundOrderInput } from "@/types/inventory";
 
@@ -47,9 +48,8 @@ export default function InventoryInboundForm() {
   const [fieldErrors, setFieldErrors] = useState<InventoryFormErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isSubmitting, isLocked, run } = useSubmissionLock();
   const formRef = useRef<HTMLFormElement>(null);
-  const submittingRef = useRef(false);
 
   useEffect(() => {
     const firstError = Object.keys(fieldErrors)[0] as InventoryFormField | undefined;
@@ -97,7 +97,7 @@ export default function InventoryInboundForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submittingRef.current) return;
+    if (isLocked()) return;
     setError(null);
     setSuccess(null);
 
@@ -114,36 +114,32 @@ export default function InventoryInboundForm() {
     if (!ingredient) return;
 
     setFieldErrors({});
-    submittingRef.current = true;
-    setIsSubmitting(true);
+    void run(async () => {
+      const input: InboundOrderInput = {
+        ingredient_id: ingredient.id,
+        quantity: Number(values.quantity),
+        supplier_name: values.supplierName.trim(),
+        location_id: Number(values.locationId),
+      };
 
-    const input: InboundOrderInput = {
-      ingredient_id: ingredient.id,
-      quantity: Number(values.quantity),
-      supplier_name: values.supplierName.trim(),
-      location_id: Number(values.locationId),
-    };
-
-    try {
-      await createInboundOrder(input);
-      const unit = ingredient.unit === "kg"
-        ? "kg"
-        : ingredient.unit === "litro"
-          ? input.quantity === 1 ? "litro" : "litros"
-          : input.quantity === 1 ? "unidad" : "unidades";
-      setValues(INITIAL_VALUES);
-      setFieldErrors({});
-      setSuccess(
-        `Entrada registrada: ${quantityFormatter.format(input.quantity)} ${unit} de ${ingredient.name} (Local ${input.location_id}, proveedor ${input.supplier_name}).`,
-      );
-    } catch (caught) {
-      setError(caught instanceof InventoryServiceError || caught instanceof Error
-        ? caught.message
-        : "No se pudo registrar la entrada. Inténtalo de nuevo.");
-    } finally {
-      submittingRef.current = false;
-      setIsSubmitting(false);
-    }
+      try {
+        await createInboundOrder(input);
+        const unit = ingredient.unit === "kg"
+          ? "kg"
+          : ingredient.unit === "litro"
+            ? input.quantity === 1 ? "litro" : "litros"
+            : input.quantity === 1 ? "unidad" : "unidades";
+        setValues(INITIAL_VALUES);
+        setFieldErrors({});
+        setSuccess(
+          `Entrada registrada: ${quantityFormatter.format(input.quantity)} ${unit} de ${ingredient.name} (Local ${input.location_id}, proveedor ${input.supplier_name}).`,
+        );
+      } catch (caught) {
+        setError(caught instanceof InventoryServiceError || caught instanceof Error
+          ? caught.message
+          : "No se pudo registrar la entrada. Inténtalo de nuevo.");
+      }
+    });
   }
 
   function fieldDescription(field: InventoryFormField, extraId?: string) {
