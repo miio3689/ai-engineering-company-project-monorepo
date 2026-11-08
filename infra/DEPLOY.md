@@ -15,7 +15,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml ...
 - Recomendado: al menos 2 vCPU y 4 GB de RAM; la interfaz ejecuta servidores
   de desarrollo de Next.js y Vite.
 - Git para clonar el repositorio y acceder a la rama `docker`.
-- Puertos 3000, 5174 y 8000 disponibles. No se usa un dominio ni HTTPS.
+- Puertos 3000 (website), 3001 (backoffice) y 8000 (API) disponibles en el host.
+  No se usa un dominio ni HTTPS.
 - Docker Engine, el plugin oficial Docker Compose, `curl`, `openssl` y `tar`.
 
 El Compose base usa `env_file` con `required: false`, opción disponible desde
@@ -76,19 +77,24 @@ copies la clave a documentación, chat o repositorio.
 | Variable | Para qué sirve | Valor de ejemplo |
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | URL del API que usa el navegador. | `http://203.0.113.10:8000` |
-| `CORS_ALLOWED_ORIGINS` | Orígenes web permitidos por el API, separados por comas. | `http://203.0.113.10:3000,http://203.0.113.10:5174` |
-| `FRONTEND_BASE_URL` | Origen de la interfaz usado para construir enlaces de restablecimiento. | `http://203.0.113.10:3000` |
+| `CORS_ALLOWED_ORIGINS` | Orígenes web permitidos por el API; incluye el origen del backoffice y, si llama al API, el del website. | `http://203.0.113.10:3001,http://203.0.113.10:3000` |
+| `FRONTEND_BASE_URL` | Origen del backoffice usado para construir enlaces de restablecimiento. | `http://203.0.113.10:3001` |
 | `VITE_ALLOWED_HOSTS` | Host permitido por Vite para el sitio web. | `203.0.113.10` |
 | `API_INTERNAL_URL` | URL interna que usa Next.js para hablar con el servicio API. | `http://api:8000` (valor predeterminado) |
 | `WATCH_POLLING` | Controla el polling de los watchers en desarrollo. En producción se fuerza a `false`. | `false` |
 | `JWT_SECRET_KEY` | Clave de firma JWT; obligatoria, mínimo 32 caracteres. | Generada en el VPS con `openssl rand -hex 32`; no usar un literal de ejemplo. |
 | `DATABASE_URL` | Conexión SQL opcional para los endpoints de inventario. | Vacío si no se configura; el inventario no estará disponible. |
 | `RESEND_API_KEY` | Clave opcional de Resend para enviar correos de recuperación. | Vacío si no se configura; no se enviarán esos correos. |
-| `BACKOFFICE_PORT` | Puerto público del backoffice. | `3000` |
-| `WEBSITE_PORT` | Puerto público del sitio web. | `5174` |
+| `BACKOFFICE_PORT` | Puerto del host publicado para el backoffice; dentro del contenedor Next.js escucha en 3000. | `3001` |
+| `WEBSITE_PORT` | Puerto del host publicado para el website; dentro del contenedor Vite escucha en 5174. | `3000` |
 | `API_ENV_FILE` | Ruta del archivo de variables para el API; opcional, por defecto `./.env`. | `./.env` |
 | `UIS_ENV_FILE` | Ruta del archivo de variables para las interfaces; opcional, por defecto `./.env`. | `./.env` |
 | Puerto del API | Puerto público fijo del servicio API; no hay variable configurable en Compose. | `8000` |
+
+El mapeo host→contenedor es `3000→5174` para website y `3001→3000` para
+backoffice. La API permanece en `8000→8000`. `CORS_ALLOWED_ORIGINS` debe
+incluir el origen del backoffice en `:3001`; `FRONTEND_BASE_URL` debe apuntar
+a ese mismo origen para los enlaces de recuperación.
 
 `203.0.113.10` es una IP reservada para documentación: reemplázala por la IP
 pública del VPS. `CORS_ALLOWED_ORIGINS` debe contener solo los orígenes que
@@ -107,22 +113,22 @@ sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --bui
 
 ```sh
 sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
-curl -fsS -o /dev/null -w 'backoffice: %{http_code}\n' http://203.0.113.10:3000/
-curl -fsS -o /dev/null -w 'website: %{http_code}\n' http://203.0.113.10:5174/
+curl -fsS -o /dev/null -w 'website: %{http_code}\n' http://203.0.113.10:3000/
+curl -fsS -o /dev/null -w 'backoffice: %{http_code}\n' http://203.0.113.10:3001/
 curl -fsS -o /dev/null -w 'api: %{http_code}\n' http://203.0.113.10:8000/docs
 sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml exec uis \
   wget -qO- http://api:8000/docs >/dev/null \
   && echo 'uis -> api por nombre de servicio: OK'
 ```
 
-Los tres `curl` deben informar `200`; el último comando comprueba la resolución
+Los cuatro `curl` deben informar `200`; el último comando comprueba la resolución
 del servicio `api` en la red privada de Compose desde `uis`. La IP de estos
 comandos también es un marcador documental y debe reemplazarse.
 
 ## 5. Firewall y puertos públicos
 
 En el VPS revisado, UFW no está activo y no hay acceso al panel de firewall del
-proveedor. Los puertos TCP **3000**, **5174** y **8000** ya se comprobaron
+proveedor. Los puertos TCP **3000**, **3001** y **8000** ya se comprobaron
 accesibles desde Internet. Docker publica puertos mediante reglas que pueden
 saltarse las reglas de UFW, así que UFW inactivo no filtra estas publicaciones.
 No abras 443: este despliegue no incluye TLS. Limita la exposición con un

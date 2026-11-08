@@ -9,13 +9,13 @@ Each subfolder inside `uis/` must correspond to **one specific user interface** 
 
 ## Development container
 
-The Dockerfile in this folder runs the public Vite website on port `5174` and the Next.js backoffice on port `3000`. The existing backoffice configuration is preserved; its port is not changed to `3001`.
+The Dockerfile runs the public Vite website on container port `5174` and the Next.js backoffice on container port `3000`. With the root Compose file, host ports map as website `3000 -> 5174` and backoffice `3001 -> 3000`; the container ports and `start.sh` remain unchanged.
 
 From `uis/`, build and run both interfaces with:
 
 ```bash
 docker build -t brasaland-uis .
-docker run --rm -p 5174:5174 -p 3000:3000 brasaland-uis
+docker run --rm -p 3000:5174 -p 3001:3000 brasaland-uis
 ```
 
 > _Spanish version: [README.es.md](./README.es.md)._
