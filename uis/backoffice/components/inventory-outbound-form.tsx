@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { useInventoryIngredientStock } from "@/hooks/use-inventory-ingredient-stock";
 import { useInventoryProducts } from "@/hooks/use-inventory-products";
+import { useSubmissionLock } from "@/hooks/use-submission-lock";
 import {
   getLocationStock,
   getStockLevel,
@@ -73,9 +74,8 @@ export default function InventoryOutboundForm() {
   const [quantityApiError, setQuantityApiError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<SuccessSummary | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isSubmitting, isLocked, run } = useSubmissionLock();
   const formRef = useRef<HTMLFormElement>(null);
-  const submittingRef = useRef(false);
   const selectedIngredient = ingredients.find(
     (ingredient) => String(ingredient.id) === values.ingredientId,
   );
@@ -130,7 +130,7 @@ export default function InventoryOutboundForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submittingRef.current) return;
+    if (isLocked()) return;
     setQuantityApiError(null);
     setError(null);
     setSuccess(null);
@@ -148,46 +148,42 @@ export default function InventoryOutboundForm() {
     if (!ingredient) return;
 
     setFieldErrors({});
-    submittingRef.current = true;
-    setIsSubmitting(true);
+    void run(async () => {
+      const input: OutboundOrderInput = {
+        ingredient_id: ingredient.id,
+        quantity: Number(values.quantity),
+        reason: values.reason,
+        location_id: Number(values.locationId),
+      };
 
-    const input: OutboundOrderInput = {
-      ingredient_id: ingredient.id,
-      quantity: Number(values.quantity),
-      reason: values.reason,
-      location_id: Number(values.locationId),
-    };
-
-    try {
-      await createOutboundOrder(input);
-      setValues((current) => ({
-        ...current,
-        quantity: "",
-        reason: "consumption",
-        locationId: "",
-      }));
-      setFieldErrors({});
-      setSuccess({
-        ingredientName: ingredient.name,
-        quantity: input.quantity,
-        unit: ingredient.unit,
-        reason: input.reason,
-        locationId: input.location_id,
-      });
-      stock.refresh();
-    } catch (caught) {
-      if (caught instanceof InventoryServiceError && caught.status === 400) {
-        setQuantityApiError(caught.message);
+      try {
+        await createOutboundOrder(input);
+        setValues((current) => ({
+          ...current,
+          quantity: "",
+          reason: "consumption",
+          locationId: "",
+        }));
+        setFieldErrors({});
+        setSuccess({
+          ingredientName: ingredient.name,
+          quantity: input.quantity,
+          unit: ingredient.unit,
+          reason: input.reason,
+          locationId: input.location_id,
+        });
         stock.refresh();
-      } else {
-        setError(caught instanceof Error
-          ? caught.message
-          : "No se pudo registrar la salida. Inténtalo de nuevo.");
+      } catch (caught) {
+        if (caught instanceof InventoryServiceError && caught.status === 400) {
+          setQuantityApiError(caught.message);
+          stock.refresh();
+        } else {
+          setError(caught instanceof Error
+            ? caught.message
+            : "No se pudo registrar la salida. Inténtalo de nuevo.");
+        }
       }
-    } finally {
-      submittingRef.current = false;
-      setIsSubmitting(false);
-    }
+    });
   }
 
   function fieldDescription(field: InventoryFormField, extraId?: string) {

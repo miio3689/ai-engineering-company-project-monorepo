@@ -18,4 +18,24 @@ docker build -t brasaland-uis .
 docker run --rm -p 3000:5174 -p 3001:3000 brasaland-uis
 ```
 
+## Production builds
+
+For the public website, run these commands from `uis/website/`:
+
+```bash
+npm run build
+npm run start
+```
+
+The website is served on port `5174`.
+
+For the backoffice, run these commands from `uis/backoffice/`:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL="https://api.example.com" npm run build
+npm run start -- --port 3001
+```
+
+`NEXT_PUBLIC_API_BASE_URL` is embedded in the frontend bundle during the build, so set it to the API URL before building.
+
 > _Spanish version: [README.es.md](./README.es.md)._

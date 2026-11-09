@@ -9,4 +9,10 @@ const allowedHosts = configuredHosts
 
 export default defineConfig({
   server: allowedHosts ? { allowedHosts } : {},
+  preview: { allowedHosts },
+  build: {
+    rollupOptions: {
+      input: ['index.html', 'application.html'],
+    },
+  },
 });
