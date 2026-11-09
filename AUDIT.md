@@ -99,4 +99,17 @@ TTFB e INP quedan fuera de la priorización cuantitativa hasta obtener medicione
 
 ## Resultados tras las correcciones
 
+| Página | Modo | Perf. inicial → final | Acc./BP/SEO | LCP inicial → final | CLS inicial → final | TBT inicial → final | Capturas / nota |
+|---|---|---:|---|---|---|---|---|
+| Backoffice `/inventory/products` | Escritorio | 100 → 100 | 100/100/60 | 0,3 → 0,3 s | 0,009 → 0,009 | 0 → 0 ms | [Antes](audit/before/backoffice/products/01-products-desktop.png); sin cambios, no se volvió a medir |
+| Backoffice `/inventory/products` | Móvil | 100 → 100 | 100/100/60 | 0,9 → 0,9 s | 0,035 → 0,035 | 20 → 20 ms | [Antes](audit/before/backoffice/products/01-products-mobile.png); sin cambios, no se volvió a medir |
+| Backoffice `/incidents/list` | Escritorio | 77 → 100 | 100/100/60 | 0,3 → 0,3 s | 0,662 → 0,026 | 0 → 0 ms | [Después Fix 1](audit/after/backoffice/incidents-list/01-incidents-list-desktop-fix1.png) |
+| Backoffice `/incidents/list` | Móvil | 90 → 100 | 100/100/60 | 0,9 → 0,9 s | 0,21 → 0,049 | 10 → 10 ms | [Después Fix 1](audit/after/backoffice/incidents-list/01-incidents-list-mobile-fix1.png) |
+| Website `/` | Escritorio | 100 → 100 | 96/100/58 | 0,7 → 0,6 s | 0,032 → 0,045 | 0 → 0 ms | [Después Fix 3](audit/after/website/home/01-home-desktop-fix3.png); CLS varió ligeramente, sigue en verde |
+| Website `/` | Móvil | 95 → 100 | 96/100/58 | 2,9 → 1,0 s | 0,036 → 0,036 | 10 → 0 ms | [Después Fix 3](audit/after/website/home/01-home-mobile-fix3.png) |
+| Website `/application.html` | Escritorio | 100 → 100 | 100/100/54 | 0,5 → 0,3 s | 0,015 → 0,015 | 0 → 0 ms | [Después Fix 3](audit/after/website/application/01-application-desktop-fix3.png) |
+| Website `/application.html` | Móvil | 100 → 100 | 100/100/54 | 1,1 → 0,9 s | 0,03 → 0,029 | 30 → 20 ms | [Después Fix 3](audit/after/website/application/01-application-mobile-fix3.png) |
+
+Los valores de productos son los de la medición inicial: no se volvieron a medir porque esa página no cambió. Las capturas `-fixN` corresponden a la medición posterior al fix indicado; cuando no hubo cambios posteriores en esa página, representan también el estado final. El detalle de las mediciones intermedias, commits, fixes no aplicados y limitaciones está en [REPORT.md](REPORT.md).
+
 
