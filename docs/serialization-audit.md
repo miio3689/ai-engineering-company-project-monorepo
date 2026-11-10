@@ -126,3 +126,15 @@ Se mantienen los IDs de perfil, los diez campos de proveedor validados por el ba
 - **Proveedores:** `SupplierResponse` dejó de heredar de `Supplier`; el esquema de respuesta declara de manera independiente los mismos diez campos serializados. La prueba confirma los `$ref` de entrada/salida OpenAPI y el conjunto exacto de claves devuelto.
 - **Inventario:** se añadieron aserciones de forma para los ocho campos de `IngredientRead`, y para los movimientos inbound/outbound, incluyendo `user_uuid` y sus respectivos campos `supplier_name`/`reason`. Se mantienen la proyección plana por ubicación y los contratos de entrada separados.
 - **Validación de esta fase:** baseline **122/122**; tests enfocados de incidencias **18/18** y de proveedores/inventario **31/31**; suite completa final **126/126**, 0 fallidos, en **48.759 s** con dotenv deshabilitado. Se mantuvo un warning de deprecación de Starlette/httpx.
+
+## 8. Verificación manual (Fase 3)
+
+Se probaron manualmente tres endpoints desde la documentación interactiva de FastAPI (`/docs`) con la API en ejecución, y se comprobó que la forma de cada respuesta coincide con su esquema:
+
+| Endpoint | Resultado | Coincide con el esquema |
+|---|---|---|
+| `POST /auth/login` | 200 con solo `access_token` y `token_type` | Sí (`TokenResponse`) |
+| `GET /auth/me` | 200 con `email`, `role` y `profile`, sin campos de contraseña | Sí (`AuthMeResponse`) |
+| `GET /api/incidents/summary` | 200 con `total`, `by_status`, `by_category`, `by_origin` y `by_branch` | Sí (`IncidentSummary`) |
+
+Además, la suite automática completa pasó con 126 tests de 126.
