@@ -14,7 +14,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..auth_security import get_current_user
 from ..database import get_incidents_tables
-from ..models import Incident, IncidentCreate, IncidentStatusUpdate
+from ..models import (
+    Incident,
+    IncidentCreate,
+    IncidentStatusUpdate,
+    IncidentSummary,
+)
 from ..shared_paths import ensure_shared_python_path
 
 ensure_shared_python_path()
@@ -179,8 +184,8 @@ def list_incidents(
     ]
 
 
-@router.get("/summary")
-def incidents_summary() -> dict[str, Any]:
+@router.get("/summary", response_model=IncidentSummary)
+def incidents_summary() -> IncidentSummary:
     with _database_lock, get_incidents_tables() as (incidents, _):
         records = incidents.all()
 
@@ -190,13 +195,13 @@ def incidents_summary() -> dict[str, Any]:
             for value in values
         }
 
-    return {
-        "total": len(records),
-        "by_status": count_by("status", INCIDENT_STATUSES),
-        "by_category": count_by("category", INCIDENT_CATEGORIES),
-        "by_origin": count_by("origin", INCIDENT_ORIGINS),
-        "by_branch": count_by("branch", tuple(value for value, _ in BRANCHES)),
-    }
+    return IncidentSummary(
+        total=len(records),
+        by_status=count_by("status", INCIDENT_STATUSES),
+        by_category=count_by("category", INCIDENT_CATEGORIES),
+        by_origin=count_by("origin", INCIDENT_ORIGINS),
+        by_branch=count_by("branch", tuple(value for value, _ in BRANCHES)),
+    )
 
 
 @router.get("/{id}", response_model=Incident)

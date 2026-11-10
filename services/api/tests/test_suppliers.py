@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from services.api import database, seed, services_auth
 from services.api.app import main
+from services.api.models import Supplier, SupplierResponse
 from services.api.routes import suppliers
 
 
@@ -69,6 +70,39 @@ class SupplierEndpointsTests(unittest.TestCase):
         self.assertEqual(self.client.get(url).status_code, 404)
         self.assertEqual(self.client.delete(url).status_code, 404)
         self.assertEqual(len(self.client.get("/suppliers").json()), 15)
+
+    def test_supplier_input_and_output_schemas_are_separate_and_keep_all_fields(self):
+        self.assertFalse(issubclass(SupplierResponse, Supplier))
+        expected_fields = {
+            "id",
+            "name",
+            "country",
+            "categories",
+            "rate_per_unit",
+            "currency",
+            "status",
+            "updated_at",
+            "contact_email",
+            "notes",
+        }
+        created = self.client.post("/suppliers", json=self.payload).json()
+        self.assertEqual(set(created), expected_fields)
+        self.assertEqual(set(self.client.get("/suppliers").json()[0]), expected_fields)
+
+        openapi = self.client.get("/openapi.json").json()
+        create_operation = openapi["paths"]["/suppliers"]["post"]
+        request_schema = create_operation["requestBody"]["content"][
+            "application/json"
+        ]["schema"]["$ref"]
+        response_schema = create_operation["responses"]["201"]["content"][
+            "application/json"
+        ]["schema"]["$ref"]
+        self.assertEqual(request_schema, "#/components/schemas/Supplier")
+        self.assertEqual(response_schema, "#/components/schemas/SupplierResponse")
+        self.assertEqual(
+            set(openapi["components"]["schemas"]["SupplierResponse"]["properties"]),
+            expected_fields,
+        )
 
     def test_filters(self):
         for params, names in [
