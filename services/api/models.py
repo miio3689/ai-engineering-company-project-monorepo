@@ -172,6 +172,19 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class TokenResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    access_token: str
+    token_type: Literal["bearer"]
+
+
+class MessageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str
+
+
 class UserCreate(EmailModel):
     password: str
     role: UserRole = UserRole.user
@@ -182,6 +195,12 @@ class UserRegistration(EmailModel):
     name: str | None = None
     phone: str | None = None
     address: str | None = None
+
+
+class RegistrationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
 
 
 class UserUpdate(BaseModel):
@@ -229,9 +248,14 @@ class ProfileUpdate(BaseModel):
     address: str | None = None
 
 
-class ProfileResponse(ProfileCreate):
+class ProfileResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: int
     user_id: int
+    name: str
+    phone: str | None
+    address: str | None
 
 
 class AuthMeResponse(BaseModel):

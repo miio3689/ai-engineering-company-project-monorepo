@@ -13,7 +13,9 @@ from ..models import (
     AuthMeResponse,
     ChangePasswordRequest,
     ForgotPasswordRequest,
+    MessageResponse,
     ResetPasswordRequest,
+    TokenResponse,
     UserResponse,
 )
 
@@ -71,8 +73,8 @@ def _create_and_send_reset_email(to_email: str) -> None:
         )
 
 
-@router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()) -> dict[str, str]:
+@router.post("/login", response_model=TokenResponse)
+def login(form_data: OAuth2PasswordRequestForm = Depends()) -> TokenResponse:
     user = services_auth.autenticar_usuario(form_data.username, form_data.password)
     if user is None:
         raise HTTPException(
@@ -80,23 +82,23 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()) -> dict[str, str]:
             detail="Credenciales inválidas.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return {
-        "access_token": create_access_token(user),
-        "token_type": "bearer",
-    }
+    return TokenResponse(
+        access_token=create_access_token(user),
+        token_type="bearer",
+    )
 
 
-@router.post("/forgot-password")
+@router.post("/forgot-password", response_model=MessageResponse)
 def forgot_password(
     data: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
-) -> dict[str, str]:
+) -> MessageResponse:
     background_tasks.add_task(_create_and_send_reset_email, data.email)
-    return {"message": FORGOT_PASSWORD_MESSAGE}
+    return MessageResponse(message=FORGOT_PASSWORD_MESSAGE)
 
 
-@router.post("/reset-password")
-def reset_password(data: ResetPasswordRequest) -> dict[str, str]:
+@router.post("/reset-password", response_model=MessageResponse)
+def reset_password(data: ResetPasswordRequest) -> MessageResponse:
     try:
         services_auth.reset_password(data.token, data.new_password)
     except services_auth.InvalidResetTokenError as exc:
@@ -104,14 +106,14 @@ def reset_password(data: ResetPasswordRequest) -> dict[str, str]:
             status_code=400,
             detail="El token de restablecimiento no es válido.",
         ) from exc
-    return {"message": "Contraseña restablecida correctamente."}
+    return MessageResponse(message="Contraseña restablecida correctamente.")
 
 
-@router.post("/change-password")
+@router.post("/change-password", response_model=MessageResponse)
 def change_password(
     data: ChangePasswordRequest,
     current_user: UserResponse = Depends(get_current_user),
-) -> dict[str, str]:
+) -> MessageResponse:
     try:
         services_auth.change_password(
             current_user.id, data.current_password, data.new_password
@@ -121,7 +123,7 @@ def change_password(
             status_code=400,
             detail="La contraseña actual es incorrecta.",
         ) from exc
-    return {"message": "Contraseña actualizada correctamente."}
+    return MessageResponse(message="Contraseña actualizada correctamente.")
 
 
 @router.get("/me", response_model=AuthMeResponse)

@@ -82,6 +82,37 @@ class PasswordRouteTests(unittest.TestCase):
         )
         self.assertEqual(send_email.call_count, 1)
 
+    def test_password_success_responses_contain_only_message(self):
+        with patch.object(email_service, "send_password_reset_email"):
+            forgot = self.client.post(
+                "/auth/forgot-password", json={"email": self.email}
+            )
+        self.assertEqual(forgot.status_code, 200)
+        self.assertEqual(set(forgot.json()), {"message"})
+
+        reset_token = services_auth.create_reset_token(self.email)
+        reset = self.client.post(
+            "/auth/reset-password",
+            json={"token": reset_token, "new_password": "reset-password"},
+        )
+        self.assertEqual(reset.status_code, 200)
+        self.assertEqual(set(reset.json()), {"message"})
+
+        login = self._login("reset-password")
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(set(login.json()), {"access_token", "token_type"})
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        changed = self.client.post(
+            "/auth/change-password",
+            json={
+                "current_password": "reset-password",
+                "new_password": "changed-password",
+            },
+            headers=headers,
+        )
+        self.assertEqual(changed.status_code, 200)
+        self.assertEqual(set(changed.json()), {"message"})
+
     def test_forgot_password_email_failure_does_not_change_response(self):
         with patch.object(
             email_service,
