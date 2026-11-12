@@ -138,6 +138,7 @@ class InventoryRoutesTests(unittest.TestCase):
     def test_product_create_duplicate_sku_and_missing_detail(self):
         created = self.create_product()
         self.assertEqual(created["current_stock"], 0)
+        self.assertEqual(created["stock_by_location"], [])
         self.assertEqual(
             self.client.post(
                 "/inventory/products",
@@ -185,6 +186,101 @@ class InventoryRoutesTests(unittest.TestCase):
         self.assertEqual(detail.status_code, 200, detail.text)
         self.assertEqual(listed.json()[0]["current_stock"], 10.25)
         self.assertEqual(detail.json()["current_stock"], 10.25)
+        self.assertEqual(
+            listed.json()[0]["stock_by_location"],
+            [{"location_id": 4, "quantity": 10.25}],
+        )
+        self.assertEqual(
+            detail.json()["stock_by_location"],
+            [{"location_id": 4, "quantity": 10.25}],
+        )
+
+    def test_stock_by_location_sums_entries_and_exits_across_locations(self):
+        product = self.create_product()
+        for location_id, quantity in ((2, 7), (1, 10)):
+            response = self.client.post(
+                "/inventory/orders/inbound",
+                json={
+                    "ingredient_id": product["id"],
+                    "quantity": quantity,
+                    "supplier_name": "Proveedor",
+                    "location_id": location_id,
+                },
+                headers=self.headers,
+            )
+            self.assertEqual(response.status_code, 201, response.text)
+        outbound = self.client.post(
+            "/inventory/orders/outbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 2,
+                "reason": "consumption",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(outbound.status_code, 201, outbound.text)
+
+        detail = self.client.get(
+            f"/inventory/products/{product['id']}",
+            headers=self.headers,
+        ).json()
+        self.assertEqual(
+            detail["stock_by_location"],
+            [
+                {"location_id": 1, "quantity": 8.0},
+                {"location_id": 2, "quantity": 7.0},
+            ],
+        )
+        self.assertEqual(detail["current_stock"], 15.0)
+        self.assertAlmostEqual(
+            sum(row["quantity"] for row in detail["stock_by_location"]),
+            detail["current_stock"],
+            places=3,
+        )
+
+    def test_stock_by_location_is_empty_without_movements(self):
+        product = self.create_product()
+        response = self.client.get(
+            f"/inventory/products/{product['id']}",
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["current_stock"], 0)
+        self.assertEqual(response.json()["stock_by_location"], [])
+
+    def test_product_list_includes_stock_by_location_for_multiple_ingredients(self):
+        first = self.create_product()
+        second = self.create_product(
+            PRODUCT | {"name": "Costilla de cerdo", "sku": "BRS-PORK-002"}
+        )
+        for ingredient_id, location_id, quantity in (
+            (first["id"], 1, 3),
+            (second["id"], 2, 5),
+        ):
+            response = self.client.post(
+                "/inventory/orders/inbound",
+                json={
+                    "ingredient_id": ingredient_id,
+                    "quantity": quantity,
+                    "supplier_name": "Proveedor",
+                    "location_id": location_id,
+                },
+                headers=self.headers,
+            )
+            self.assertEqual(response.status_code, 201, response.text)
+
+        response = self.client.get("/inventory/products", headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        products = {item["id"]: item for item in response.json()}
+        self.assertEqual(
+            products[first["id"]]["stock_by_location"],
+            [{"location_id": 1, "quantity": 3.0}],
+        )
+        self.assertEqual(
+            products[second["id"]]["stock_by_location"],
+            [{"location_id": 2, "quantity": 5.0}],
+        )
 
     def test_insufficient_stock_returns_exact_message_without_insert(self):
         product = self.create_product()
@@ -211,8 +307,8 @@ class InventoryRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.json()["detail"],
-            "Insufficient stock for ingredient 'Falda de ternera'. "
-            "Available: 5.000, requested: 5.001.",
+            "Insufficient stock for ingredient 'Falda de ternera' "
+            "at location 1. Available: 5.000, requested: 5.001.",
         )
         with Session(self.engine) as session:
             self.assertEqual(len(session.exec(select(IngredientExit)).all()), 0)
@@ -242,8 +338,8 @@ class InventoryRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.json()["detail"],
-            "Insufficient stock for ingredient 'Falda de ternera'. "
-            "Available: 0.000, requested: 0.000.",
+            "Insufficient stock for ingredient 'Falda de ternera' "
+            "at location 1. Available: 0.000, requested: 0.000.",
         )
         with Session(self.engine) as session:
             self.assertEqual(len(session.exec(select(IngredientExit)).all()), 0)
@@ -276,6 +372,131 @@ class InventoryRoutesTests(unittest.TestCase):
             headers=self.headers,
         )
         self.assertEqual(detail.json()["current_stock"], 0)
+        self.assertEqual(
+            detail.json()["stock_by_location"],
+            [{"location_id": 1, "quantity": 0.0}],
+        )
+
+    def test_outbound_without_stock_at_requested_location_is_rejected(self):
+        product = self.create_product()
+        self.client.post(
+            "/inventory/orders/inbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 10,
+                "supplier_name": "Proveedor",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        response = self.client.post(
+            "/inventory/orders/outbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 5,
+                "reason": "consumption",
+                "location_id": 5,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            "Insufficient stock for ingredient 'Falda de ternera' at location 5. "
+            "Available: 0.000, requested: 5.000.",
+        )
+
+    def test_outbound_within_local_stock_is_allowed(self):
+        product = self.create_product()
+        for location_id, quantity in ((1, 10), (2, 8)):
+            self.client.post(
+                "/inventory/orders/inbound",
+                json={
+                    "ingredient_id": product["id"],
+                    "quantity": quantity,
+                    "supplier_name": "Proveedor",
+                    "location_id": location_id,
+                },
+                headers=self.headers,
+            )
+        response = self.client.post(
+            "/inventory/orders/outbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 9,
+                "reason": "consumption",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+
+    def test_outbound_over_local_stock_is_rejected_even_below_global_total(self):
+        product = self.create_product()
+        for location_id, quantity in ((1, 5), (2, 10)):
+            self.client.post(
+                "/inventory/orders/inbound",
+                json={
+                    "ingredient_id": product["id"],
+                    "quantity": quantity,
+                    "supplier_name": "Proveedor",
+                    "location_id": location_id,
+                },
+                headers=self.headers,
+            )
+        response = self.client.post(
+            "/inventory/orders/outbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 6,
+                "reason": "waste",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            "Insufficient stock for ingredient 'Falda de ternera' at location 1. "
+            "Available: 5.000, requested: 6.000.",
+        )
+
+    def test_outbound_exact_local_stock_leaves_zero_at_that_location(self):
+        product = self.create_product()
+        for location_id, quantity in ((1, 4), (2, 10)):
+            self.client.post(
+                "/inventory/orders/inbound",
+                json={
+                    "ingredient_id": product["id"],
+                    "quantity": quantity,
+                    "supplier_name": "Proveedor",
+                    "location_id": location_id,
+                },
+                headers=self.headers,
+            )
+        response = self.client.post(
+            "/inventory/orders/outbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 4,
+                "reason": "waste",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        detail = self.client.get(
+            f"/inventory/products/{product['id']}",
+            headers=self.headers,
+        ).json()
+        self.assertEqual(detail["current_stock"], 10)
+        self.assertEqual(
+            detail["stock_by_location"],
+            [
+                {"location_id": 1, "quantity": 0.0},
+                {"location_id": 2, "quantity": 10.0},
+            ],
+        )
 
     def test_invalid_reason_quantity_and_locations_return_422(self):
         product = self.create_product()
@@ -431,7 +652,7 @@ class InventoryRoutesTests(unittest.TestCase):
 
         self.assertEqual(product_queries_one, product_queries_many)
         self.assertEqual(order_queries_one, order_queries_many)
-        self.assertEqual(product_queries_many, 1)
+        self.assertEqual(product_queries_many, 3)
         self.assertEqual(order_queries_many, 2)
 
     def test_authenticated_inventory_without_database_url_returns_503(self):

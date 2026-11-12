@@ -18,6 +18,7 @@ from ..inventory.schemas import (
     IngredientCreate,
     IngredientRead,
     InventoryOrderRead,
+    LocationStockRead,
     OutboundOrderRead,
 )
 from ..models import UserResponse
@@ -77,10 +78,62 @@ def _product_stock_statement(ingredient_id: int | None = None):
     return statement
 
 
-def _ingredient_response(ingredient: Ingredient, current_stock: float) -> IngredientRead:
+def _stock_by_location(
+    session: Session,
+    ingredient_ids: list[int],
+) -> dict[int, list[LocationStockRead]]:
+    if not ingredient_ids:
+        return {}
+
+    stock: dict[int, dict[int, float]] = {}
+    entry_totals = session.exec(
+        select(
+            IngredientEntry.ingredient_id,
+            IngredientEntry.location_id,
+            func.sum(IngredientEntry.quantity),
+        )
+        .where(IngredientEntry.ingredient_id.in_(ingredient_ids))
+        .group_by(IngredientEntry.ingredient_id, IngredientEntry.location_id)
+    ).all()
+    for ingredient_id, location_id, quantity in entry_totals:
+        stock.setdefault(ingredient_id, {})[location_id] = float(quantity)
+
+    exit_totals = session.exec(
+        select(
+            IngredientExit.ingredient_id,
+            IngredientExit.location_id,
+            func.sum(IngredientExit.quantity),
+        )
+        .where(IngredientExit.ingredient_id.in_(ingredient_ids))
+        .group_by(IngredientExit.ingredient_id, IngredientExit.location_id)
+    ).all()
+    for ingredient_id, location_id, quantity in exit_totals:
+        location_stock = stock.setdefault(ingredient_id, {})
+        location_stock[location_id] = location_stock.get(location_id, 0.0) - float(
+            quantity
+        )
+
+    return {
+        ingredient_id: [
+            LocationStockRead(
+                location_id=location_id,
+                quantity=round(quantity, 3),
+            )
+            for location_id, quantity in sorted(location_totals.items())
+        ]
+        for ingredient_id, location_totals in stock.items()
+    }
+
+
+def _ingredient_response(
+    ingredient: Ingredient,
+    current_stock: float,
+    stock_by_location: list[LocationStockRead] | None = None,
+) -> IngredientRead:
     return IngredientRead(
         **ingredient.model_dump(),
         current_stock=round(float(current_stock), 3),
+        stock_by_location=stock_by_location or [],
     )
 
 
@@ -105,9 +158,20 @@ def list_products(
 ) -> list[IngredientRead]:
     try:
         rows = session.exec(_product_stock_statement()).all()
+        stock_by_ingredient = _stock_by_location(
+            session,
+            [ingredient.id for ingredient, _ in rows if ingredient.id is not None],
+        )
     except SQLAlchemyError as exc:
         raise _database_error(session, exc) from exc
-    return [_ingredient_response(ingredient, stock) for ingredient, stock in rows]
+    return [
+        _ingredient_response(
+            ingredient,
+            stock,
+            stock_by_ingredient.get(ingredient.id, []),
+        )
+        for ingredient, stock in rows
+    ]
 
 
 @router.post(
@@ -145,7 +209,14 @@ def get_product(
     if row is None:
         raise HTTPException(status_code=404, detail="Ingrediente no encontrado.")
     ingredient, current_stock = row
-    return _ingredient_response(ingredient, current_stock)
+    try:
+        stock_by_location = _stock_by_location(session, [ingredient_id]).get(
+            ingredient_id,
+            [],
+        )
+    except SQLAlchemyError as exc:
+        raise _database_error(session, exc) from exc
+    return _ingredient_response(ingredient, current_stock, stock_by_location)
 
 
 @router.post(
@@ -210,12 +281,14 @@ def create_outbound_order(
 
         inbound = session.exec(
             select(func.coalesce(func.sum(IngredientEntry.quantity), 0)).where(
-                IngredientEntry.ingredient_id == ingredient.id
+                IngredientEntry.ingredient_id == ingredient.id,
+                IngredientEntry.location_id == order.location_id,
             )
         ).one()
         outbound = session.exec(
             select(func.coalesce(func.sum(IngredientExit.quantity), 0)).where(
-                IngredientExit.ingredient_id == ingredient.id
+                IngredientExit.ingredient_id == ingredient.id,
+                IngredientExit.location_id == order.location_id,
             )
         ).one()
         raw_available = float(inbound) - float(outbound)
@@ -226,7 +299,8 @@ def create_outbound_order(
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"Insufficient stock for ingredient '{ingredient.name}'. "
+                    f"Insufficient stock for ingredient '{ingredient.name}' "
+                    f"at location {order.location_id}. "
                     f"Available: {available:.3f}, requested: {requested:.3f}."
                 ),
             )

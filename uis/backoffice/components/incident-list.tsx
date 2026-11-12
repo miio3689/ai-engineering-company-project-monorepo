@@ -70,6 +70,36 @@ function StatusAction({
   );
 }
 
+function IncidentCardSkeleton() {
+  return (
+    <li aria-hidden="true" className="min-w-0">
+      <article className="grid min-w-0 gap-4 rounded-xl border border-gray-200 p-4 sm:p-5">
+        <header className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="h-7 w-2/3 rounded bg-gray-200" />
+            <div className="mt-2 h-6 w-full rounded bg-gray-200" />
+          </div>
+          <span className="h-8 w-24 shrink-0 rounded-full bg-gray-200" />
+        </header>
+        <dl className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="min-w-0">
+              <dt className="h-5 w-2/3 rounded bg-gray-200" />
+              <dd className="h-6 w-3/4 rounded bg-gray-200" />
+            </div>
+          ))}
+        </dl>
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(14rem,0.7fr)] sm:items-end">
+          <div className="grid min-w-0 gap-2">
+            <span className="h-6 w-1/3 rounded bg-gray-200" />
+            <span className="h-11 w-full rounded-lg bg-gray-200" />
+          </div>
+        </div>
+      </article>
+    </li>
+  );
+}
+
 export default function IncidentList() {
   const [status, setStatus] = useState<IncidentStatus | "">("");
   const [origin, setOrigin] = useState<IncidentOrigin | "">("");
@@ -186,9 +216,11 @@ export default function IncidentList() {
         </div>
 
         {loading && (
-          <p role="status" className="rounded-lg bg-gray-50 p-4 text-gray-700">
-            Cargando listado…
-          </p>
+          <ul aria-hidden="true" className="grid min-w-0 gap-4">
+            {Array.from({ length: 3 }, (_, index) => (
+              <IncidentCardSkeleton key={index} />
+            ))}
+          </ul>
         )}
         {!loading && error && (
           <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">
