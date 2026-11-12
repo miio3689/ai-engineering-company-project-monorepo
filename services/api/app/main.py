@@ -75,7 +75,7 @@ allowed_origins = [
     origin.strip()
     for origin in os.getenv(
         "CORS_ALLOWED_ORIGINS",
-        "http://localhost:3000,https://cautious-meme-q7w9qr9ppxqqhx5rr-3000.app.github.dev",
+        "http://localhost:3000,http://localhost:3001",
     ).split(",")
     if origin.strip()
 ]

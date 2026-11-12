@@ -67,6 +67,9 @@ cd brasaland
 
 ## 3. Crear el `.env` de producción en el VPS
 
+> `.env.example` es solo para desarrollo local y no debe usarse en un VPS.
+> Para producción, sigue esta sección y genera `JWT_SECRET_KEY` con `openssl rand -hex 32`.
+
 La plantilla `.env.production.example` sirve como referencia, pero no se carga
 automáticamente. En la raíz del clon crea `.env` en el propio servidor (por
 ejemplo, `nano .env`) y limita sus permisos con `chmod 600 .env`. No lo añadas
@@ -77,6 +80,7 @@ copies la clave a documentación, chat o repositorio.
 | Variable | Para qué sirve | Valor de ejemplo |
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | URL del API que usa el navegador. | `http://203.0.113.10:8000` |
+| `NEXT_ALLOWED_DEV_ORIGINS` | Hosts adicionales permitidos por el servidor de desarrollo de Next.js para servir `/_next/*` al acceder por IP o dominio distinto de localhost. Solo hosts, sin esquema ni puerto; admite una lista separada por comas. | `203.0.113.10` |
 | `CORS_ALLOWED_ORIGINS` | Orígenes web permitidos por el API; incluye el origen del backoffice y, si llama al API, el del website. | `http://203.0.113.10:3001,http://203.0.113.10:3000` |
 | `FRONTEND_BASE_URL` | Origen del backoffice usado para construir enlaces de restablecimiento. | `http://203.0.113.10:3001` |
 | `VITE_ALLOWED_HOSTS` | Host permitido por Vite para el sitio web. | `203.0.113.10` |
@@ -169,6 +173,75 @@ tar -czf "$HOME/brasaland-tinydb-$(date +%F-%H%M%S).tar.gz" \
   services/api/auth.json services/api/incidents.json services/api/suppliers.json
 sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml start api
 ```
+
+## Despliegue verificado
+
+Verificación realizada el **2026-11-12** en el VPS DigitalOcean con Ubuntu
+22.04. El repositorio está clonado en
+`~/ai-engineering-company-project-monorepo` y se desplegó la rama `docker`.
+El VPS solo tiene acceso por IP y HTTP: **209.38.249.211**. Esta es la IP del
+VPS de esta entrega; la guía genérica anterior conserva `203.0.113.10` como
+marcador de ejemplo.
+
+URLs comprobadas desde Internet, todas con respuesta HTTP **200**:
+
+- Website: <http://209.38.249.211:3000/>
+- Backoffice: <http://209.38.249.211:3001/>
+- API docs: <http://209.38.249.211:8000/docs>
+
+El `.env` del VPS configura las URLs y orígenes del navegador con esa IP:
+`NEXT_PUBLIC_API_BASE_URL` apunta a `http://209.38.249.211:8000`,
+`CORS_ALLOWED_ORIGINS` contiene
+`http://209.38.249.211:3001,http://209.38.249.211:3000`,
+`FRONTEND_BASE_URL` apunta a `http://209.38.249.211:3001`, y
+`VITE_ALLOWED_HOSTS` y `NEXT_ALLOWED_DEV_ORIGINS` contienen
+`209.38.249.211`.
+
+La consulta se realizó con:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+```
+
+El resultado fue:
+
+| Servicio | Puerto del host | Puerto del contenedor | Estado |
+| --- | ---: | ---: | --- |
+| `api` | 8000 | 8000 | `Up (healthy)` |
+| `uis` | 3001 | 3000 (backoffice) | `Up (healthy)` |
+| `uis` | 3000 | 5174 (website) | `Up (healthy)` |
+
+Las publicaciones observadas fueron `0.0.0.0:8000->8000/tcp`,
+`0.0.0.0:3001->3000/tcp` y `0.0.0.0:3000->5174/tcp`. Las tres URLs
+respondieron `200`. Para repetir las comprobaciones HTTP desde una terminal:
+
+```sh
+curl -fsS -o /dev/null -w 'website: %{http_code}\n' http://209.38.249.211:3000/
+curl -fsS -o /dev/null -w 'backoffice: %{http_code}\n' http://209.38.249.211:3001/
+curl -fsS -o /dev/null -w 'api: %{http_code}\n' http://209.38.249.211:8000/docs
+```
+
+También se verificó previamente desde `uis` la comunicación interna con la API
+mediante `wget -qO- http://api:8000/openapi.json`. En una comprobación funcional,
+se inició sesión en el backoffice desde un navegador externo con un usuario
+de prueba creado en el VPS mediante `POST /users`; la llamada del navegador a
+la API en el puerto `8000` no presentó errores de CORS. Los usuarios TinyDB
+del VPS son independientes de los de otros entornos.
+
+El arranque limpio local con la plantilla también quedó validado mediante
+`cp .env.example .env` y `docker compose up --build`: la API alcanzó el estado
+healthy, y website, backoffice y `/docs` respondieron `200` en los puertos
+locales `3000`, `3001` y `8000`, respectivamente.
+
+Durante la verificación, el servidor de desarrollo de Next devolvía `403` en
+`/_next/*` y fallaba el WebSocket de HMR al acceder por IP. Se resolvió con la
+variable `NEXT_ALLOWED_DEV_ORIGINS`, que configura `allowedDevOrigins` en
+`uis/backoffice/next.config.ts`.
+
+Como observación opcional, sin JavaScript el formulario de login se envió por
+GET y dejó los campos en la URL; al cargar los scripts el envío funcionó
+correctamente. Declarar `method="post"` en el formulario quedó como mejora no
+aplicada por pertenecer a una zona protegida.
 
 ## LIMITACIONES
 

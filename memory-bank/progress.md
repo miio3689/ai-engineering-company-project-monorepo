@@ -365,36 +365,23 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   servicio: `wget http://api:8000/openapi.json` devolvió el JSON esperado.
 - Los logs del VPS no mostraron errores de inicialización de Supabase.
 - La configuración Compose local confirma website `3000→5174`, backoffice
-  `3001→3000` y API `8000→8000`. Pendiente: reverificar estos puertos en el VPS
-  y abrir el PR; la fase 5 no se marca como validada.
+  `3001→3000` y API `8000→8000`. El 2026-11-12 se reverificaron en el VPS los
+  puertos `3000`, `3001` y `8000`; se validaron el arranque limpio con
+  `.env.example` y el inicio de sesión desde un navegador externo. La fase 5
+  queda validada. Queda pendiente abrir o reenviar el PR.
 
-## Hito 5 - Corrección de stock por local
+## Ticket #infra-40 - Orígenes de desarrollo del backoffice
 
-- `GET /inventory/products` y `GET /inventory/products/{id}` devuelven
-  `stock_by_location`, calculado mediante agregaciones agrupadas de entradas y
-  salidas por ingrediente y local; `current_stock` conserva el total global.
-- Las salidas se validan contra el disponible del local indicado, conservando
-  el bloqueo de la fila del ingrediente, el redondeo a tres decimales y HTTP
-  `400` con el nombre y local cuando no alcanza el stock.
-- Las pruebas cubren lecturas multi-locales, ingredientes sin movimientos,
-  listados de varios ingredientes, rechazo de salida en un local sin entradas,
-  disponibilidad local, exceso frente al total global y agotamiento exacto.
-- Validación: `uv run python -m unittest discover -s services/api/tests -t . -v`
-  pasó las 120 pruebas. La suite enfocada de inventario pasó 19 pruebas.
-- No se modificaron modelos de tabla, semilla ni otros archivos fuera del
-  alcance de esta corrección.
-
-## Hito 5 - Frontend de stock por local
-
-- El listado de inventario permite seleccionar «Todos los locales» o uno de
-  los 14 locales. El stock y nivel visibles siguen ese filtro; cada ingrediente
-  despliega su stock por local o «Sin movimientos».
-- El formulario de salida muestra disponible, nivel y aviso de exceso para el
-  local seleccionado; sin local no presenta una disponibilidad ni advertencia.
-  El mensaje de éxito usa el stock actualizado del local de salida.
-- Se valida `stock_by_location` en las respuestas y se cubren la selección de
-  stock local/global, locales ausentes, payloads inválidos y aviso por local.
-- Validaciones ejecutadas: `npm run lint`, `npm run typecheck`,
-  `npm run test:auth` (18 pruebas), `node --test tests/inventory-stock.test.mjs`
-  (4 pruebas) y `npm run build` en una copia temporal que excluyó `.env*`.
-  Todas pasaron; el lint quedó sin avisos.
+- `uis/backoffice/next.config.ts` lee `NEXT_ALLOWED_DEV_ORIGINS` como hosts
+  separados por comas, recorta espacios y descarta entradas vacías. La opción
+  `allowedDevOrigins` se omite si no quedan hosts configurados.
+- La documentación oficial de Next.js describe hosts sin esquema ni puerto,
+  permite comodines (`*` para una etiqueta y `**` al inicio para varias) y
+  compara el hostname de `Origin`/`Referer`. No menciona IP de forma expresa;
+  una IP literal usa ese formato de hostname. El manifiesto del backoffice
+  declara Next.js 16.3.0. No se pudo inspeccionar el paquete instalado debido
+  a una restricción de acceso.
+- La tabla de `infra/DEPLOY.md` documenta `NEXT_ALLOWED_DEV_ORIGINS` con el
+  ejemplo `203.0.113.10`.
+- Validado en el contenedor `uis`: `npm run typecheck` pasó sin errores y `next dev` arrancó con `NEXT_ALLOWED_DEV_ORIGINS` definida, cargando `next.config.ts` sin errores; el backoffice respondió 200.
+- Validado en el VPS el 2026-11-12: con la variable definida con la IP del servidor, el navegador carga `/_next/*` sin errores 403 y el inicio de sesión funciona.
