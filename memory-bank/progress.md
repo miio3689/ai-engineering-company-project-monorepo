@@ -365,8 +365,10 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   servicio: `wget http://api:8000/openapi.json` devolvió el JSON esperado.
 - Los logs del VPS no mostraron errores de inicialización de Supabase.
 - La configuración Compose local confirma website `3000→5174`, backoffice
-  `3001→3000` y API `8000→8000`. Pendiente: reverificar estos puertos en el VPS
-  y abrir el PR; la fase 5 no se marca como validada.
+  `3001→3000` y API `8000→8000`. El 2026-11-12 se reverificaron en el VPS los
+  puertos `3000`, `3001` y `8000`; se validaron el arranque limpio con
+  `.env.example` y el inicio de sesión desde un navegador externo. La fase 5
+  queda validada. Queda pendiente abrir o reenviar el PR.
 
 ## Ticket #infra-40 - Orígenes de desarrollo del backoffice
 
