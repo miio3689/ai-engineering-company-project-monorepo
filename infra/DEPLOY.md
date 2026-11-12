@@ -80,6 +80,7 @@ copies la clave a documentación, chat o repositorio.
 | Variable | Para qué sirve | Valor de ejemplo |
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | URL del API que usa el navegador. | `http://203.0.113.10:8000` |
+| `NEXT_ALLOWED_DEV_ORIGINS` | Hosts adicionales permitidos por el servidor de desarrollo de Next.js para servir `/_next/*` al acceder por IP o dominio distinto de localhost. Solo hosts, sin esquema ni puerto; admite una lista separada por comas. | `203.0.113.10` |
 | `CORS_ALLOWED_ORIGINS` | Orígenes web permitidos por el API; incluye el origen del backoffice y, si llama al API, el del website. | `http://203.0.113.10:3001,http://203.0.113.10:3000` |
 | `FRONTEND_BASE_URL` | Origen del backoffice usado para construir enlaces de restablecimiento. | `http://203.0.113.10:3001` |
 | `VITE_ALLOWED_HOSTS` | Host permitido por Vite para el sitio web. | `203.0.113.10` |

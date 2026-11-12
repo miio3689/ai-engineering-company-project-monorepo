@@ -367,3 +367,22 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
 - La configuración Compose local confirma website `3000→5174`, backoffice
   `3001→3000` y API `8000→8000`. Pendiente: reverificar estos puertos en el VPS
   y abrir el PR; la fase 5 no se marca como validada.
+
+## Ticket #infra-40 - Orígenes de desarrollo del backoffice
+
+- `uis/backoffice/next.config.ts` lee `NEXT_ALLOWED_DEV_ORIGINS` como hosts
+  separados por comas, recorta espacios y descarta entradas vacías. La opción
+  `allowedDevOrigins` se omite si no quedan hosts configurados.
+- La documentación oficial de Next.js describe hosts sin esquema ni puerto,
+  permite comodines (`*` para una etiqueta y `**` al inicio para varias) y
+  compara el hostname de `Origin`/`Referer`. No menciona IP de forma expresa;
+  una IP literal usa ese formato de hostname. El manifiesto del backoffice
+  declara Next.js 16.3.0. No se pudo inspeccionar el paquete instalado debido
+  a una restricción de acceso.
+- La tabla de `infra/DEPLOY.md` documenta `NEXT_ALLOWED_DEV_ORIGINS` con el
+  ejemplo `203.0.113.10`.
+- Pendiente de validar en el entorno: `npm run typecheck`, `npm run lint`,
+  `npm run build` y `npm run dev` no pudieron ejecutarse porque `tsc`, `eslint`
+  y `next` no están disponibles en `uis/backoffice`. No se instaló ni modificó
+  ninguna dependencia.
+- El despliegue en VPS sigue pendiente de evidencia; no se marca como validado.
