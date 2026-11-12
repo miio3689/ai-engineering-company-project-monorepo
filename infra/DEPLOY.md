@@ -67,6 +67,9 @@ cd brasaland
 
 ## 3. Crear el `.env` de producción en el VPS
 
+> `.env.example` es solo para desarrollo local y no debe usarse en un VPS.
+> Para producción, sigue esta sección y genera `JWT_SECRET_KEY` con `openssl rand -hex 32`.
+
 La plantilla `.env.production.example` sirve como referencia, pero no se carga
 automáticamente. En la raíz del clon crea `.env` en el propio servidor (por
 ejemplo, `nano .env`) y limita sus permisos con `chmod 600 .env`. No lo añadas

@@ -9,17 +9,29 @@ This folder contains **infrastructure configurations** for the monorepo (for exa
 
 ## Despliegue local y en VPS de Brasaland
 
-Desde la raíz del repositorio, inicia el stack de desarrollo local con:
+### Arranque rápido con Docker (local)
+
+Requisitos: Docker con Docker Compose 2.24 o superior. Desde la raíz del
+repositorio:
 
 ```sh
-docker compose up -d --build
+cp .env.example .env
+docker compose up --build
 ```
 
-Los puertos del host son website `3000` (contenedor `5174`), backoffice `3001`
-(contenedor `3000`) y API `8000` (contenedor `8000`). Para requisitos del VPS,
-instalación, variables de entorno, verificación y operación, consulta la
-[guía de despliegue](./DEPLOY.md). En el VPS, crea `.env` en el servidor y no
-lo añadas nunca a Git; después despliega con:
+- Website: http://localhost:3000
+- Backoffice: http://localhost:3001
+- API: http://localhost:8000/docs
+
+`JWT_SECRET_KEY` de la plantilla es solo para desarrollo local. Con
+`DATABASE_URL` vacío, el inventario no está disponible; con `RESEND_API_KEY`
+vacío, no se envían correos de recuperación. Para un VPS, sigue la
+[guía de despliegue](./DEPLOY.md) y `.env.production.example`, usando una clave
+generada con `openssl rand -hex 32`.
+
+Para requisitos, instalación, variables de entorno, verificación y operación
+en el VPS, consulta la [guía de despliegue](./DEPLOY.md). Después de crear
+`.env` en el servidor, no lo añadas nunca a Git:
 
 ```sh
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
