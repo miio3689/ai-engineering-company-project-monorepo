@@ -61,13 +61,69 @@ class Supplier(BaseModel):
         return self
 
 
-class SupplierResponse(Supplier):
-    """Persisted supplier with a TinyDB document ID and server-side timestamp."""
+class SupplierResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
     id: int
+    name: str
+    country: Literal["Colombia", "USA"]
+    categories: list[
+        Literal[
+            "carne",
+            "verduras_y_hortalizas",
+            "salsas_y_condimentos",
+            "bebidas",
+            "packaging",
+            "productos_limpieza",
+            "lacteos",
+            "carbon_y_combustible",
+        ]
+    ]
+    rate_per_unit: float
+    currency: Literal["COP", "USD"]
+    status: SupplierStatus
+    contact_email: str | None = None
+    notes: str | None = None
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+
+
+class IncidentSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    total: int
+    by_status: dict[str, int]
+    by_category: dict[str, int]
+    by_origin: dict[str, int]
+    by_branch: dict[str, int]
+
+
+class IncidentBreakdown(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    count: int
+    percentage: float
+
+
+class IncidentSatisfaction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    average: float | None
+    scored_cases: int
+    counts: dict[str, int]
+
+
+class IncidentAnalysisResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    total_records: int
+    valid_records: int
+    invalid_records: int
+    invalid_by_rule: dict[str, int]
+    category_counts: dict[str, IncidentBreakdown]
+    status_counts: dict[str, IncidentBreakdown]
+    satisfaction: IncidentSatisfaction
 
 
 class SupplierRateUpdate(BaseModel):
@@ -172,6 +228,19 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class TokenResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    access_token: str
+    token_type: Literal["bearer"]
+
+
+class MessageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str
+
+
 class UserCreate(EmailModel):
     password: str
     role: UserRole = UserRole.user
@@ -182,6 +251,12 @@ class UserRegistration(EmailModel):
     name: str | None = None
     phone: str | None = None
     address: str | None = None
+
+
+class RegistrationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
 
 
 class UserUpdate(BaseModel):
@@ -229,9 +304,14 @@ class ProfileUpdate(BaseModel):
     address: str | None = None
 
 
-class ProfileResponse(ProfileCreate):
+class ProfileResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: int
     user_id: int
+    name: str
+    phone: str | None
+    address: str | None
 
 
 class AuthMeResponse(BaseModel):

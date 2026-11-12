@@ -41,13 +41,16 @@ class AuthEndpointsTests(unittest.TestCase):
             "/users", json={"email": email, "password": self.password} | fields
         )
         self.assertEqual(response.status_code, 201, response.text)
-        return response.json()
+        payload = response.json()
+        self.assertEqual(set(payload), {"id"})
+        return payload | {"email": email}
 
     def headers(self, email):
         response = self.client.post(
             "/auth/login", data={"username": email, "password": self.password}
         )
         self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(set(response.json()), {"access_token", "token_type"})
         self.assertEqual(response.json()["token_type"], "bearer")
         return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
@@ -79,8 +82,8 @@ class AuthEndpointsTests(unittest.TestCase):
                 self.assertEqual(response.json()["detail"][0]["loc"], ["body", "role"])
                 self.assertEqual(services_auth.listar_usuarios(), [])
         user = self.register()
-        self.assertEqual(user["role"], "user")
-        self.assertNotIn("hashed_password", user)
+        stored_user = services_auth.obtener_usuario_por_id(user["id"])
+        self.assertEqual(stored_user.role, UserRole.user)
         response = self.client.get("/auth/me", headers=self.headers(user["email"]))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["role"], "user")
@@ -91,6 +94,77 @@ class AuthEndpointsTests(unittest.TestCase):
         self.assertEqual(duplicate.status_code, 409)
         self.assertNotIn("alice@example.com", duplicate.text.lower())
         self.assertEqual(len(services_auth.listar_usuarios()), 1)
+
+    def test_auth_registration_and_profile_response_shapes_and_openapi(self):
+        openapi = self.client.get("/openapi.json").json()
+
+        def response_schema(path, method, status_code="200"):
+            return openapi["paths"][path][method]["responses"][status_code][
+                "content"
+            ]["application/json"]["schema"]["$ref"]
+
+        self.assertEqual(
+            response_schema("/auth/login", "post"),
+            "#/components/schemas/TokenResponse",
+        )
+        for path in ("/auth/forgot-password", "/auth/reset-password", "/auth/change-password"):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    response_schema(path, "post"),
+                    "#/components/schemas/MessageResponse",
+                )
+        self.assertEqual(
+            response_schema("/users", "post", "201"),
+            "#/components/schemas/RegistrationResponse",
+        )
+        self.assertEqual(
+            response_schema("/auth/me", "get"),
+            "#/components/schemas/AuthMeResponse",
+        )
+        for method in ("get", "put"):
+            self.assertEqual(
+                response_schema("/profiles/me", method),
+                "#/components/schemas/ProfileResponse",
+            )
+
+        schemas = openapi["components"]["schemas"]
+        self.assertEqual(
+            set(schemas["TokenResponse"]["properties"]),
+            {"access_token", "token_type"},
+        )
+        self.assertEqual(set(schemas["MessageResponse"]["properties"]), {"message"})
+        self.assertEqual(set(schemas["RegistrationResponse"]["properties"]), {"id"})
+        self.assertEqual(
+            set(schemas["ProfileResponse"]["properties"]),
+            {"id", "user_id", "name", "phone", "address"},
+        )
+        self.assertNotIn("hashed_password", schemas["UserResponse"]["properties"])
+
+        email = "minimal-response@example.com"
+        registration = self.client.post(
+            "/users", json={"email": email, "password": self.password}
+        )
+        self.assertEqual(registration.status_code, 201, registration.text)
+        self.assertEqual(set(registration.json()), {"id"})
+        self.assertNotIn("email", registration.json())
+        self.assertNotIn("password", registration.json())
+        self.assertNotIn("hashed_password", registration.json())
+
+        login = self.client.post(
+            "/auth/login", data={"username": email, "password": self.password}
+        )
+        self.assertEqual(login.status_code, 200, login.text)
+        self.assertEqual(set(login.json()), {"access_token", "token_type"})
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        account = self.client.get("/auth/me", headers=headers).json()
+        profile = self.client.get("/profiles/me", headers=headers).json()
+        expected_profile_fields = {"id", "user_id", "name", "phone", "address"}
+        self.assertEqual(set(account), {"email", "role", "profile"})
+        self.assertEqual(set(account["profile"]), expected_profile_fields)
+        self.assertEqual(set(profile), expected_profile_fields)
+        self.assertEqual(account["profile"], profile)
+        self.assertNotIn("hashed_password", account)
+        self.assertNotIn("hashed_password", profile)
 
     def test_profile_persistence_failure_returns_generic_500_and_rolls_back_user(self):
         email = "profile-persistence@example.com"

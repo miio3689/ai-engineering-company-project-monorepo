@@ -9,6 +9,7 @@ from .. import services_auth
 from ..auth_security import get_current_user
 from ..models import (
     ProfileCreate,
+    RegistrationResponse,
     UserCreate,
     UserRegistration,
     UserResponse,
@@ -20,8 +21,8 @@ router = APIRouter(prefix="/users", tags=["users"])
 logger = logging.getLogger(__name__)
 
 
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register_user(data: UserRegistration) -> UserResponse:
+@router.post("", response_model=RegistrationResponse, status_code=status.HTTP_201_CREATED)
+def register_user(data: UserRegistration) -> RegistrationResponse:
     profile = ProfileCreate(
         name=(data.name or "").strip() or data.email.partition("@")[0],
         phone=data.phone,
@@ -55,7 +56,7 @@ def register_user(data: UserRegistration) -> UserResponse:
         raise HTTPException(
             status_code=500, detail="Error interno del servidor."
         ) from None
-    return user
+    return RegistrationResponse(id=user.id)
 
 
 @router.get("", response_model=list[UserResponse])

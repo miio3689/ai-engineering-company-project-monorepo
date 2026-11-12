@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from fastapi.routing import APIRoute
 
 from services.api import database
 from services.api.app import main
@@ -213,6 +214,112 @@ class IncidentEndpointsTests(unittest.TestCase):
         for group in ("by_status", "by_category", "by_origin", "by_branch"):
             self.assertTrue(payload[group])
             self.assertEqual(set(payload[group].values()), {0})
+
+    def test_summary_response_has_exactly_the_typed_contract_fields(self):
+        response = self.client.get("/api/incidents/summary")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(
+            set(payload),
+            {"total", "by_status", "by_category", "by_origin", "by_branch"},
+        )
+        self.assertIsInstance(payload["total"], int)
+        for group in ("by_status", "by_category", "by_origin", "by_branch"):
+            self.assertTrue(all(isinstance(value, int) for value in payload[group].values()))
+
+    def test_all_api_routes_have_response_models_or_declared_exceptions(self):
+        expected_exceptions = {
+            ("DELETE", "/users/{user_id}"),
+            ("DELETE", "/suppliers/{id}"),
+            ("GET", "/api/incidents/results/export"),
+        }
+        declared_routers = (
+            main.auth_router,
+            main.incidents_router,
+            main.inventory_router,
+            main.profiles_router,
+            main.suppliers_router,
+            main.users_router,
+        )
+        routes = [
+            route
+            for router in declared_routers
+            for route in router.routes
+            if isinstance(route, APIRoute) and route.include_in_schema
+        ]
+        routes.extend(
+            route
+            for route in main.app.routes
+            if isinstance(route, APIRoute) and route.include_in_schema
+        )
+        routes_without_models = {
+            (method, route.path)
+            for route in routes
+            for method in route.methods
+            if route.response_model is None
+        }
+        self.assertEqual(routes_without_models, expected_exceptions)
+
+        openapi_paths = self.client.get("/openapi.json").json()["paths"]
+        for method, path in expected_exceptions:
+            if method == "DELETE":
+                no_content_response = openapi_paths[path]["delete"]["responses"][
+                    "204"
+                ]
+                self.assertNotIn("content", no_content_response)
+
+        export_schema = openapi_paths["/api/incidents/results/export"]["get"][
+            "responses"
+        ]["200"]
+        self.assertIn("CSV", export_schema["description"])
+        self.assertEqual(set(export_schema["content"]), {"text/csv"})
+        self.assertEqual(
+            export_schema["content"]["text/csv"]["schema"],
+            {"type": "string"},
+        )
+
+    def test_analyze_response_preserves_exact_nested_shape_and_nullable_average(self):
+        csv_content = (
+            "incident_id,date,location_id,category,description,status,"
+            "customer_id,satisfaction_score,reporter_id\n"
+            "SYN-001,2026-10-28,COL-01,SUPPLY,Synthetic supply issue,OPEN,,,SYN-EMP-1\n"
+        )
+        with patch.object(main, "_latest_metrics", None):
+            response = self.client.post(
+                "/api/incidents/analyze",
+                files={"file": ("synthetic.csv", csv_content, "text/csv")},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(
+            set(payload),
+            {
+                "total_records",
+                "valid_records",
+                "invalid_records",
+                "invalid_by_rule",
+                "category_counts",
+                "status_counts",
+                "satisfaction",
+            },
+        )
+        for field in ("total_records", "valid_records", "invalid_records"):
+            self.assertIsInstance(payload[field], int)
+        self.assertIsInstance(payload["invalid_by_rule"], dict)
+        self.assertTrue(
+            all(isinstance(value, int) for value in payload["invalid_by_rule"].values())
+        )
+        for field in ("category_counts", "status_counts"):
+            for breakdown in payload[field].values():
+                self.assertEqual(set(breakdown), {"count", "percentage"})
+                self.assertIsInstance(breakdown["count"], int)
+                self.assertIsInstance(breakdown["percentage"], (int, float))
+        satisfaction = payload["satisfaction"]
+        self.assertEqual(set(satisfaction), {"average", "scored_cases", "counts"})
+        self.assertIsNone(satisfaction["average"])
+        self.assertIsInstance(satisfaction["scored_cases"], int)
+        self.assertTrue(all(isinstance(value, int) for value in satisfaction["counts"].values()))
 
     def test_summary_counts_each_allowed_group(self):
         self.create_incident(

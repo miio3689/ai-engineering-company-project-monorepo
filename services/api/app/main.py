@@ -31,7 +31,7 @@ from services.api.routes.suppliers import router as suppliers_router  # noqa: E4
 from services.api.routes.users import router as users_router  # noqa: E402
 from services.api.auth_security import get_current_user  # noqa: E402
 from services.api.inventory.database import init_inventory_db  # noqa: E402
-from services.api.models import UserResponse  # noqa: E402
+from services.api.models import IncidentAnalysisResponse, UserResponse  # noqa: E402
 
 EXPECTED_COLUMNS = (
     "incident_id",
@@ -150,11 +150,14 @@ def parse_incident_csv(content: bytes) -> list[dict[str, str]]:
         raise HTTPException(status_code=400, detail="El fichero no tiene un formato CSV válido.") from exc
 
 
-@app.post("/api/incidents/analyze")
+@app.post(
+    "/api/incidents/analyze",
+    response_model=IncidentAnalysisResponse,
+)
 async def analyze_incidents(
     file: UploadFile = File(...),
     current_user: UserResponse = Depends(get_current_user),
-) -> dict[str, Any]:
+) -> IncidentAnalysisResponse:
     """Analyze uploaded incident CSV records with the shared script functions."""
     global _latest_metrics
 
@@ -228,11 +231,24 @@ async def analyze_incidents(
         }
         with _metrics_lock:
             _latest_metrics = metrics
-        return result
+        return IncidentAnalysisResponse.model_validate(result)
     finally:
         await file.close()
 
-@app.get("/api/incidents/results/export")
+@app.get(
+    "/api/incidents/results/export",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "CSV con los resultados del último análisis.",
+            "content": {"text/csv": {"schema": {"type": "string"}}},
+        },
+        404: {
+            "description": "No hay resultados de análisis disponibles.",
+            "content": {"application/json": {"schema": {"type": "object"}}},
+        },
+    },
+)
 def export_latest_results(
     current_user: UserResponse = Depends(get_current_user),
 ) -> Response:

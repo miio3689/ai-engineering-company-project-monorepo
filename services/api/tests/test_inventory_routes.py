@@ -137,6 +137,19 @@ class InventoryRoutesTests(unittest.TestCase):
 
     def test_product_create_duplicate_sku_and_missing_detail(self):
         created = self.create_product()
+        self.assertEqual(
+            set(created),
+            {
+                "id",
+                "name",
+                "sku",
+                "unit",
+                "category",
+                "country",
+                "current_stock",
+                "stock_by_location",
+            },
+        )
         self.assertEqual(created["current_stock"], 0)
         self.assertEqual(created["stock_by_location"], [])
         self.assertEqual(
@@ -638,6 +651,21 @@ class InventoryRoutesTests(unittest.TestCase):
         self.assertEqual({order["type"] for order in orders}, {"inbound", "outbound"})
         self.assertEqual(orders[0]["type"], "outbound")
         for order in orders:
+            self.assertEqual(
+                set(order),
+                {
+                    "id",
+                    "type",
+                    "ingredient_id",
+                    "name",
+                    "sku",
+                    "quantity",
+                    "location_id",
+                    "created_at",
+                    "user_uuid",
+                    "reason" if order["type"] == "outbound" else "supplier_name",
+                },
+            )
             self.assertEqual(order["name"], PRODUCT["name"])
             self.assertEqual(order["sku"], PRODUCT["sku"])
 
