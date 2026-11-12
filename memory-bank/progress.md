@@ -383,8 +383,5 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   a una restricción de acceso.
 - La tabla de `infra/DEPLOY.md` documenta `NEXT_ALLOWED_DEV_ORIGINS` con el
   ejemplo `203.0.113.10`.
-- Pendiente de validar en el entorno: `npm run typecheck`, `npm run lint`,
-  `npm run build` y `npm run dev` no pudieron ejecutarse porque `tsc`, `eslint`
-  y `next` no están disponibles en `uis/backoffice`. No se instaló ni modificó
-  ninguna dependencia.
-- El despliegue en VPS sigue pendiente de evidencia; no se marca como validado.
+- Validado en el contenedor `uis`: `npm run typecheck` pasó sin errores y `next dev` arrancó con `NEXT_ALLOWED_DEV_ORIGINS` definida, cargando `next.config.ts` sin errores; el backoffice respondió 200.
+- Validado en el VPS el 2026-11-12: con la variable definida con la IP del servidor, el navegador carga `/_next/*` sin errores 403 y el inicio de sesión funciona.
