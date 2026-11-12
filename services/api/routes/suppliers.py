@@ -92,7 +92,7 @@ def update_supplier_status(
     return SupplierResponse(id=record.doc_id, **(dict(record) | changes))
 
 
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
 def delete_supplier(
     id: int,
     current_user: UserResponse = Depends(get_current_user),
