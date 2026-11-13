@@ -7,6 +7,7 @@ import io
 import logging
 import os
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Lock
@@ -86,6 +87,32 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS", "PATCH", "PUT", "DELETE"],
     allow_headers=["Accept", "Authorization", "Content-Type"],
 )
+
+
+# Configure timing logger
+timing_logger = logging.getLogger("api.timing")
+if not timing_logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(message)s")
+    handler.setFormatter(formatter)
+    timing_logger.addHandler(handler)
+    timing_logger.setLevel(logging.INFO)
+    timing_logger.propagate = False
+
+
+@app.middleware("http")
+async def timing_middleware(request: Request, call_next):
+    """Log HTTP request timing: method, path (no query string), status, and duration in ms."""
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    timing_logger.info(
+        f"{request.method} {request.url.path} {response.status_code} {duration_ms:.2f}ms"
+    )
+    return response
+
+
 _latest_metrics: dict[str, Any] | None = None
 _metrics_lock = Lock()
 
