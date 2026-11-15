@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { validatePasswordPair } from "@/lib/password-validation";
 import { AuthError, changePassword } from "@/services/auth";
+import { track } from "@/services/telemetry";
 import type { AuthFieldErrors, PasswordField } from "@/types/auth";
 
 export function useChangePassword() {
@@ -53,6 +54,7 @@ export function useChangePassword() {
     setBusy(true);
     try {
       await changePassword({ current_password: currentPassword, new_password: newPassword });
+      track("password_changed", { method: "change_password" });
       form.reset();
       setSuccess(true);
     } catch (caught) {

@@ -6,7 +6,24 @@ import { useRouter } from "next/navigation";
 import { validateAuthForm } from "@/lib/auth-form-validation";
 import { ACCESS_TOKEN_KEY } from "@/services/api-client";
 import { AuthError, login, register } from "@/services/auth";
+import { startTelemetrySession, track } from "@/services/telemetry";
 import type { AuthFieldErrors, AuthMode, RegistrationInput } from "@/types/auth";
+
+let failedLoginAttempts = 0;
+
+type LoginFailureReason = "invalid_credentials" | "validation_error" | "service_error";
+
+function loginFailureReason(caught: unknown): LoginFailureReason {
+  if (caught instanceof AuthError && caught.code === "invalid_credentials") return "invalid_credentials";
+  if (caught instanceof AuthError && Object.keys(caught.fields).length) return "validation_error";
+  return "service_error";
+}
+
+// Nunca incluye el correo ni la contraseña escritos.
+function trackLoginFailure(reason: LoginFailureReason) {
+  failedLoginAttempts += 1;
+  track("login_failed", { failure_reason: reason, attempt_number_in_session: failedLoginAttempts });
+}
 
 export function useAuthForm(mode: AuthMode) {
   const router = useRouter();
@@ -47,6 +64,7 @@ export function useAuthForm(mode: AuthMode) {
     const validation = validateAuthForm(input, mode);
     if (Object.keys(validation).length) {
       setErrors(validation);
+      if (mode === "login") trackLoginFailure("validation_error");
       return;
     }
 
@@ -59,8 +77,12 @@ export function useAuthForm(mode: AuthMode) {
       }
       const token = await login(input);
       window.localStorage.setItem(ACCESS_TOKEN_KEY, token.access_token);
+      failedLoginAttempts = 0;
+      startTelemetrySession();
+      track("login_succeeded", { auth_method: "password" });
       router.replace("/");
     } catch (caught) {
+      if (mode === "login") trackLoginFailure(loginFailureReason(caught));
       if (accountCreated) {
         setError("Tu cuenta se ha creado, pero no se pudo completar el inicio de sesión. Ve a Iniciar sesión con tus credenciales; no necesitas registrarte otra vez.");
       } else if (caught instanceof AuthError) {

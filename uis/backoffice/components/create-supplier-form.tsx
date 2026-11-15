@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 
+import { useFlowAbandonment } from "@/hooks/use-flow-abandonment";
 import { createSupplier } from "@/services/suppliers";
 import {
   SUPPLIER_CATEGORIES, SUPPLIER_CATEGORY_LABELS, SUPPLIER_COUNTRIES,
@@ -11,6 +12,7 @@ import {
 const fieldClass = "min-h-11 w-full rounded-lg border border-gray-400 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700";
 
 export default function CreateSupplierForm({ onSaved }: { onSaved: (supplier: Supplier) => void }) {
+  const abandonment = useFlowAbandonment("supplier_create");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -28,26 +30,48 @@ export default function CreateSupplierForm({ onSaved }: { onSaved: (supplier: Su
     const email = String(data.get("contact_email") ?? "").trim();
     setError(null);
     setSuccess(null);
-    if (!name) return setError("Introduce el nombre del proveedor.");
-    if (!country) return setError("Selecciona el país del proveedor.");
-    if (!categories.length) return setError("Selecciona al menos una categoría.");
-    if (!Number.isFinite(rate) || rate <= 0) return setError("La tarifa debe ser un número mayor que cero.");
-    if (currency !== "COP" && currency !== "USD") return setError("Selecciona una moneda válida.");
+    if (!name) {
+      abandonment.validationFailed();
+      return setError("Introduce el nombre del proveedor.");
+    }
+    if (!country) {
+      abandonment.validationFailed();
+      return setError("Selecciona el país del proveedor.");
+    }
+    if (!categories.length) {
+      abandonment.validationFailed();
+      return setError("Selecciona al menos una categoría.");
+    }
+    if (!Number.isFinite(rate) || rate <= 0) {
+      abandonment.validationFailed();
+      return setError("La tarifa debe ser un número mayor que cero.");
+    }
+    if (currency !== "COP" && currency !== "USD") {
+      abandonment.validationFailed();
+      return setError("Selecciona una moneda válida.");
+    }
     if (currency !== (country === "Colombia" ? "COP" : "USD")) {
+      abandonment.validationFailed();
       return setError(`Para ${country}, la moneda debe ser ${country === "Colombia" ? "COP" : "USD"}.`);
     }
-    if (status !== SupplierStatus.Active && status !== SupplierStatus.Suspended) return setError("Selecciona un estado válido.");
+    if (status !== SupplierStatus.Active && status !== SupplierStatus.Suspended) {
+      abandonment.validationFailed();
+      return setError("Selecciona un estado válido.");
+    }
     const emailInput = form.elements.namedItem("contact_email");
     if (email && emailInput instanceof HTMLInputElement && !emailInput.validity.valid) {
+      abandonment.validationFailed();
       return setError("Introduce un correo de contacto válido, por ejemplo compras@empresa.com.");
     }
     setBusy(true);
+    abandonment.submitStarted();
     try {
       const supplier = await createSupplier({
         name, country, categories, rate_per_unit: rate, currency, status,
         ...(email ? { contact_email: email } : {}),
         ...(String(data.get("notes") ?? "").trim() ? { notes: String(data.get("notes")).trim() } : {}),
       });
+      abandonment.completed();
       onSaved(supplier);
       form.reset();
       setSuccess(`Proveedor ${supplier.name} creado correctamente. Si hay filtros activos, solo aparecerá si coincide con ellos.`);
@@ -61,7 +85,20 @@ export default function CreateSupplierForm({ onSaved }: { onSaved: (supplier: Su
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-5" aria-labelledby="create-supplier-title">
       <h2 id="create-supplier-title" className="mb-4 text-xl font-bold">Nuevo proveedor</h2>
-      <form noValidate onSubmit={submit} onReset={() => { setError(null); setSuccess(null); }}>
+      <form
+        noValidate
+        onSubmit={submit}
+        onChange={(event) => {
+          const data = new FormData(event.currentTarget);
+          const filledFields = new Set(
+            Array.from(data.entries())
+              .filter(([, value]) => String(value).trim() !== "")
+              .map(([field]) => field),
+          );
+          abandonment.fieldEdited(filledFields.size);
+        }}
+        onReset={() => { setError(null); setSuccess(null); }}
+      >
         <fieldset disabled={busy} className="grid gap-4 disabled:opacity-70 sm:grid-cols-2" aria-describedby={error ? "supplier-create-error" : undefined}>
           <legend className="sr-only">Datos del nuevo proveedor</legend>
           <label className="grid gap-2 font-semibold">Nombre *

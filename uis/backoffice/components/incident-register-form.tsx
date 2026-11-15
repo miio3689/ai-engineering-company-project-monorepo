@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { useFlowAbandonment } from "@/hooks/use-flow-abandonment";
 import { createIncident, IncidentServiceError } from "@/services/incidents";
+import { track } from "@/services/telemetry";
 import {
   INCIDENT_BRANCHES,
   INCIDENT_CATEGORIES,
@@ -37,6 +39,7 @@ const INITIAL_VALUES: FormValues = {
 const fieldClass = "min-h-11 w-full rounded-lg border border-gray-400 bg-white px-3 py-2 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700";
 
 export default function IncidentRegisterForm() {
+  const abandonment = useFlowAbandonment("incident_register");
   const [values, setValues] = useState<FormValues>(INITIAL_VALUES);
   const [fieldErrors, setFieldErrors] = useState<IncidentFieldErrors>({});
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +58,11 @@ export default function IncidentRegisterForm() {
     field: Field,
     value: FormValues[Field],
   ) {
+    const updatedValues = { ...values, [field]: value };
+    abandonment.fieldEdited(
+      [updatedValues.title, updatedValues.description, updatedValues.category]
+        .filter((fieldValue) => String(fieldValue).trim() !== "").length,
+    );
     setValues((current) => ({ ...current, [field]: value }));
     setFieldErrors((current) => {
       const next = { ...current };
@@ -86,6 +94,7 @@ export default function IncidentRegisterForm() {
 
     const validationErrors = validate();
     if (Object.keys(validationErrors).length) {
+      abandonment.validationFailed();
       setFieldErrors(validationErrors);
       setError("Revisa los campos señalados antes de guardar.");
       return;
@@ -103,7 +112,14 @@ export default function IncidentRegisterForm() {
     };
 
     try {
-      await createIncident(input);
+      abandonment.submitStarted();
+      const incident = await createIncident(input);
+      abandonment.completed();
+      track("incident_created", {
+        incident_id: incident.id,
+        category: input.category,
+        status: input.status,
+      });
       setValues(INITIAL_VALUES);
       setFieldErrors({});
       setSuccess("La incidencia se registró correctamente.");

@@ -234,3 +234,22 @@ export function resetTelemetryForTests(
   flushIntervalMs = options.flushIntervalMs ?? FLUSH_INTERVAL_MS;
   baseBackoffMs = options.baseBackoffMs ?? BASE_BACKOFF_MS;
 }
+
+/** Fuerza el envío inmediato con sendBeacon (para eventos creados al cerrar la página). */
+export function flushOnExit(): void {
+  flushWithBeacon();
+}
+
+/** Indica si el token guardado ya caducó (solo lee el claim exp; no valida la firma). */
+export function accessTokenExpired(): boolean {
+  try {
+    const payload = window.localStorage.getItem(ACCESS_TOKEN_KEY)?.split(".")[1];
+    if (!payload) return false;
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const claims = JSON.parse(atob(padded)) as { exp?: unknown };
+    return typeof claims.exp === "number" && claims.exp * 1000 <= Date.now();
+  } catch {
+    return false;
+  }
+}

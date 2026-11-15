@@ -1,4 +1,6 @@
+import { toRouteTemplate } from "@/lib/telemetry-routes";
 import { API_CONNECTION_MESSAGE, API_UNAVAILABLE_MESSAGE } from "@/services/api-errors";
+import { accessTokenExpired, track } from "@/services/telemetry";
 
 export const ACCESS_TOKEN_KEY = "access_token";
 
@@ -37,8 +39,23 @@ export async function apiRequest(
     throw new Error(API_CONNECTION_MESSAGE);
   }
 
+  if (response.status >= 500 && response.status <= 599) {
+    track("api_error_returned", {
+      method: (options.method ?? "GET").toUpperCase(),
+      route_template: toRouteTemplate(path),
+      status_code: response.status,
+      error_category: response.status === 503 ? "database_unavailable" : "internal_error",
+    });
+  }
+
   if (authenticated && response.status === 401) {
     if (typeof window !== "undefined") {
+      track("session_expired", {
+        expiry_cause: accessTokenExpired() ? "token_expired" : "token_invalid",
+        last_route: toRouteTemplate(
+          typeof window.location?.pathname === "string" ? window.location.pathname : "/",
+        ),
+      });
       try {
         window.localStorage.removeItem(ACCESS_TOKEN_KEY);
       } finally {

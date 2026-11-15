@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { validatePasswordPair } from "@/lib/password-validation";
 import { AuthError, resetPassword } from "@/services/auth";
+import { track } from "@/services/telemetry";
 import type { AuthFieldErrors, PasswordField } from "@/types/auth";
 
 export function useResetPassword(token: string) {
@@ -50,6 +51,7 @@ export function useResetPassword(token: string) {
     setBusy(true);
     try {
       await resetPassword({ token, new_password: newPassword });
+      track("password_changed", { method: "reset_password" });
       router.replace("/login?reset=success");
     } catch (caught) {
       setError(

@@ -5,7 +5,12 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { useInventoryProducts } from "@/hooks/use-inventory-products";
+import { useFlowAbandonment } from "@/hooks/use-flow-abandonment";
 import { useSubmissionLock } from "@/hooks/use-submission-lock";
+import {
+  trackInboundCreated,
+  trackInventoryValidationFailed,
+} from "@/lib/inventory-telemetry";
 import { createInboundOrder, InventoryServiceError } from "@/services/inventory";
 import { LOCATION_IDS, type InboundOrderInput } from "@/types/inventory";
 
@@ -39,6 +44,7 @@ const quantityFormatter = new Intl.NumberFormat("es-ES", {
 });
 
 export default function InventoryInboundForm() {
+  const abandonment = useFlowAbandonment("inbound_order");
   const searchParams = useSearchParams();
   const { ingredients, loading, error: ingredientsError, retry } = useInventoryProducts();
   const [values, setValues] = useState<FormValues>(() => ({
@@ -62,6 +68,11 @@ export default function InventoryInboundForm() {
     field: Field,
     value: FormValues[Field],
   ) {
+    const updatedValues = { ...values, [field]: value };
+    abandonment.fieldEdited(
+      [updatedValues.ingredientId, updatedValues.quantity, updatedValues.supplierName, updatedValues.locationId]
+        .filter((fieldValue) => fieldValue.trim() !== "").length,
+    );
     setValues((current) => ({ ...current, [field]: value }));
     setFieldErrors((current) => {
       const next = { ...current };
@@ -103,6 +114,12 @@ export default function InventoryInboundForm() {
 
     const validationErrors = validate();
     if (Object.keys(validationErrors).length) {
+      abandonment.validationFailed();
+      trackInventoryValidationFailed(
+        "inbound_order",
+        validationErrors,
+        Number(values.locationId) || undefined,
+      );
       setFieldErrors(validationErrors);
       setError("Revisa los campos señalados antes de registrar la entrada.");
       return;
@@ -123,7 +140,10 @@ export default function InventoryInboundForm() {
       };
 
       try {
-        await createInboundOrder(input);
+        abandonment.submitStarted();
+        const order = await createInboundOrder(input);
+        abandonment.completed();
+        trackInboundCreated(ingredient, input, order);
         const unit = ingredient.unit === "kg"
           ? "kg"
           : ingredient.unit === "litro"

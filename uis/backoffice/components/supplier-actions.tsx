@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState } from "react";
 
+import { track } from "@/services/telemetry";
 import { updateSupplierRate, updateSupplierStatus } from "@/services/suppliers";
 import { SupplierStatus, type Supplier } from "@/types/supplier";
 
@@ -24,13 +25,18 @@ export default function SupplierActions({ supplier, onSaved }: {
   const [success, setSuccess] = useState<string | null>(null);
   const buttonClass = "min-h-11 rounded-lg border border-gray-400 px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60";
 
-  async function save(operation: () => Promise<Supplier>, message: string) {
+  async function save(
+    operation: () => Promise<Supplier>,
+    message: string,
+    onSuccess?: (updated: Supplier) => void,
+  ) {
     setBusy(true);
     setError(null);
     setSuccess(null);
     try {
       const updated = await operation();
       onSaved(updated);
+      onSuccess?.(updated);
       setEditing(false);
       setSuccess(message);
     } catch (caught) {
@@ -56,6 +62,12 @@ export default function SupplierActions({ supplier, onSaved }: {
           onSubmit={(rate) => void save(
             () => updateSupplierRate(supplier.id, rate),
             "Tarifa actualizada.",
+            () => track("supplier_rate_changed", {
+              supplier_id: supplier.id,
+              country: supplier.country === "Colombia" ? "CO" : "US",
+              currency: supplier.currency,
+              new_rate: rate,
+            }),
           )}
         />
       ) : (

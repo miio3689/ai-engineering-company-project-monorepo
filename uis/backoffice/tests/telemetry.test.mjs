@@ -201,3 +201,29 @@ test("la allowlist del código coincide con docs/telemetry/event-schemas.json", 
     );
   }
 });
+
+const { toRouteTemplate, sectionForRoute } = await import("../lib/telemetry-routes.ts");
+const { errorFingerprint } = await import("../lib/telemetry-errors.ts");
+
+test("toRouteTemplate sustituye identificadores y descarta la query string", () => {
+  assert.equal(toRouteTemplate("/inventory/products/12"), "/inventory/products/{id}");
+  assert.equal(toRouteTemplate("/candidates/abc"), "/candidates/{id}");
+  assert.equal(toRouteTemplate("/inventory/orders/inbound?ingredient_id=5"), "/inventory/orders/inbound");
+  assert.equal(toRouteTemplate("/login?password=secreto"), "/login");
+  assert.equal(toRouteTemplate("/"), "/");
+});
+
+test("sectionForRoute devuelve la sección o null", () => {
+  assert.equal(sectionForRoute("/"), "home");
+  assert.equal(sectionForRoute("/login"), "auth");
+  assert.equal(sectionForRoute("/inventory/products"), "inventory");
+  assert.equal(sectionForRoute("/account/profile"), "account");
+  assert.equal(sectionForRoute("/ruta-que-no-existe"), null);
+});
+
+test("errorFingerprint es estable y tiene el formato del esquema", () => {
+  const first = errorFingerprint("TypeError", "x is undefined", "/inventory/products");
+  assert.equal(first, errorFingerprint("TypeError", "x is undefined", "/inventory/products"));
+  assert.notEqual(first, errorFingerprint("TypeError", "otro mensaje", "/inventory/products"));
+  assert.match(first, /^[0-9a-f]{8}$/);
+});

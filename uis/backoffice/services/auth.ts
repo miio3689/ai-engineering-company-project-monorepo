@@ -20,7 +20,11 @@ const fieldMessages: Record<AuthField, string> = {
 };
 
 export class AuthError extends Error {
-  constructor(message: string, public readonly fields: AuthFieldErrors = {}) {
+  constructor(
+    message: string,
+    public readonly fields: AuthFieldErrors = {},
+    public readonly code?: "invalid_credentials",
+  ) {
     super(message);
     this.name = "AuthError";
   }
@@ -43,7 +47,7 @@ async function responseError(
     return new AuthError("", { email: "Ya existe una cuenta con este correo. Inicia sesión o usa otro." });
   }
   if (!registration && response.status === 401) {
-    return new AuthError("El correo o la contraseña no son correctos.");
+    return new AuthError("El correo o la contraseña no son correctos.", {}, "invalid_credentials");
   }
   if (response.status === 422) {
     const payload = await readAuthJson(response);
