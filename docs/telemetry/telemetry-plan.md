@@ -261,3 +261,93 @@ Las propiedades obligatorias van en la columna 2; las opcionales, en la 3. Los s
 | Importes y cantidades | Datos de negocio; se guardan en la moneda del local sin conversión |
 
 La anonimización se hace **antes de emitir**: la allowlist se aplica en el origen del evento, no al leerlo después. Para análisis, `userId` se puede agregar por local o rol sin exponerlo en informes.
+
+
+## 8. Estrategia de entrega
+
+### 8.1 Stream o batch por evento
+
+Criterio: la urgencia de la **decisión** que alimenta el evento, no la preferencia técnica. Si la decisión se toma en minutos mientras alguien trabaja, es **stream**. Si se toma en horas, días o semanas, es **batch** (lotes cada hora o cada día).
+
+| `event_type` | Modo | Justificación |
+|---|---|---|
+| `stock_threshold_triggered` | **stream** | Un cocinero sin lomo de res en pleno servicio necesita que el local se reabastezca en minutos; un aviso al día llega tarde |
+| `login_failed` | **stream** | Un ataque de fuerza bruta se corta en segundos; el contador de intentos por sesión solo sirve si es inmediato |
+| `api_error_returned` | **stream** | Una caída de base de datos (503) afecta a todos los locales a la vez y operaciones debe enterarse mientras ocurre |
+| `inbound_order_created` | batch (diario) | Consolidar compras se decide semanalmente; no cambia nada ver la entrada en segundos |
+| `outbound_order_created` | batch (diario) | El pedido a proveedores se sugiere por ritmo de consumo del día anterior |
+| `stock_waste_registered` | batch (diario) | La auditoría de merma se programa por locales y semanas, no por evento |
+| `direct_stock_edit_rejected` | batch (diario) | La decisión es capacitar o ajustar permisos, que se toma por local y semana. Si la política cambia a "alertar por posible robo", se pasa a stream |
+| `ingredient_price_variance_detected` | batch (cada hora) | Renegociar con un proveedor es un proceso de días; una hora de retraso es irrelevante. El lote horario permite agrupar alertas |
+| `outbound_order_rejected` | batch (diario) | Decide conteos físicos programados, no acciones inmediatas |
+| `product_created`, `supplier_rate_changed`, `incident_created` | batch (diario) | Decisiones de gestión semanales |
+| `inventory_form_validation_failed`, `flow_abandoned`, `page_viewed`, `page_load_measured` | batch (diario) | Rediseño de pantallas y priorización de mejoras: se decide por tendencia |
+| `login_succeeded`, `session_expired`, `password_changed` | batch (diario) | Dimensionar soporte y ajustar la duración del token son decisiones de tendencia |
+| `api_latency_recorded` | batch (cada hora) | Priorizar optimizaciones es una decisión semanal; ya llega agregado por minuto |
+| `frontend_error_captured` | batch (diario) | Se prioriza por frecuencia; un error aislado no exige reacción inmediata |
+
+Resumen: **3 eventos en stream y 18 en batch**. Que el stream sea minoría es deliberado: cada pipeline en tiempo real cuesta más de mantener, y solo se justifica cuando alguien actúa en minutos.
+
+### 8.2 Throttle y debounce para eventos de alta frecuencia
+
+| Evento | Riesgo de volumen | Estrategia |
+|---|---|---|
+| `api_latency_recorded` | Una fila por petición sería el evento más voluminoso del sistema | **Agregación en origen**: un evento por ruta, método y clase de estado cada 60 s, con `request_count`, `p50_ms`, `p95_ms` y `max_ms`. No hay un evento por petición; el detalle por petición se queda en el log `api.timing` ya existente |
+| `page_viewed` | Los re-renderizados repetirían la vista | Solo se emite en **cambio de ruta**; **debounce de 1 segundo** para ignorar redirecciones inmediatas y la misma ruta repetida |
+| `page_load_measured` | Una medición por navegación | Una sola por navegación completa; sin muestreo mientras el volumen sea de 14 locales |
+| `inventory_form_validation_failed` | Un usuario que teclea mal puede disparar decenas de errores | **Throttle**: como máximo 1 evento por formulario y campo cada 10 segundos y por sesión |
+| `frontend_error_captured` | Un error en un bucle de render inundaría el canal | **Deduplicación por `error_fingerprint`**: máximo 5 eventos por huella, por sesión y por minuto |
+| `login_failed` | Un ataque genera miles de intentos | Se emiten los primeros 20 por minuto y sesión; después se agrupan en un único evento con el contador `attempt_number_in_session` actualizado. Nunca se descarta sin contar |
+| `stock_threshold_triggered` | Un producto bajo el mínimo repetiría la alerta con cada salida | **Disparo por cruce**: solo se emite al pasar de por encima a por debajo del mínimo; se vuelve a armar cuando el stock supera de nuevo el umbral |
+| `flow_abandoned` | Varias salidas del mismo formulario | Se emite una sola vez por apertura del formulario, al salir de la ruta |
+
+Reglas comunes: el reintento de envío conserva el mismo `eventId`; si el canal falla, el frontend guarda los eventos en memoria hasta un máximo de 100 y descarta los más antiguos, y la telemetría **nunca bloquea ni retrasa una acción del usuario**.
+
+## 9. Riesgos y exclusiones
+
+### 9.1 Eventos considerados y descartados
+
+| Evento descartado | Motivo |
+|---|---|
+| `inventory_location_filter_changed` (cambio del filtro de local) | No habilita ninguna decisión distinta a la que ya da `page_viewed` |
+| `product_row_expanded` (abrir "Ver stock por local") | Volumen alto y ninguna decisión de negocio concreta |
+| Pulsaciones de teclado y movimientos de ratón | Alto coste, privacidad dudosa y sin decisión asociada |
+| `password_reset_requested` (cada solicitud de "olvidé mi contraseña") | Registrarlo individualmente facilitaría enumerar cuentas existentes; el resultado final queda cubierto por `password_changed` |
+| Cuerpo completo de peticiones y respuestas de la API | Contiene datos que no están en ninguna allowlist; el middleware actual ya registra solo método, ruta, estado y duración |
+| Un evento por cada petición `GET` de listado | Cubierto por `api_latency_recorded` agregado; el coste por fila no compensa |
+| `stock_level_viewed` | Es el mismo dato que ya refleja `stock_threshold_triggered` y la latencia de la consulta |
+
+### 9.2 Datos que no se capturan por privacidad o coste
+
+- **Nombres de empleados y datos de clientes**: nunca, tampoco en forma de texto libre.
+- **Contenido de incidencias, notas y mensajes de error**: pueden incluir datos de clientes o información interna escrita por una persona.
+- **URL completa, query string, dirección IP y navegador**: una URL puede arrastrar valores escritos por el usuario (incluso credenciales si un formulario se envía por GET).
+- **Conversión de monedas**: queda fuera de la telemetría; la hace el reporte ejecutivo más adelante.
+- **Datos por petición individual de latencia**: coste de almacenamiento sin decisión asociada; basta el agregado.
+
+### 9.3 Riesgos del diseño
+
+| Riesgo | Mitigación |
+|---|---|
+| Tres eventos obligatorios dependen de cambios de modelo que aún no existen (B1, B2, B4) y uno depende de una guarda nueva (B5) | El plan los define con campos opcionales o requisitos explícitos; deben implementarse en la fase de captura antes de emitir esos eventos |
+| Sin `X-Request-Id` ni `X-Session-Id` (B6) no hay correlación entre frontend, backend y logs | Definirlos en el middleware y en la configuración CORS al empezar la instrumentación |
+| Doble conteo de salidas si una merma emitiera a la vez `outbound_order_created` y `stock_waste_registered` | Son excluyentes por orden (ver sección 10) |
+| Tamaño y retención de los datos | Propuesta: retener 13 meses los eventos de detalle y conservar agregados (por local, país y semana) más tiempo; se confirma con el pipeline de reporte |
+| El `userId` es dato personal indirecto | Solo en el envelope, nunca en `properties`; informes agregados |
+| Eventos de frontend manipulables por un usuario | Los eventos de negocio (órdenes, umbral, precio) nacen en el backend, no en el navegador; el frontend solo emite navegación, rendimiento y errores |
+| La allowlist puede quedar obsoleta | Cada cambio sube `schemaVersion` y se revisa `event-schemas.json` |
+
+## 10. Decisión de diseño más difícil
+
+Decidir **cómo contar las salidas de merma sin duplicarlas**. El BRIEFING define `outbound_order_created` como consumo de ingredientes pero también dice que una orden de salida incluye la merma, y además exige `stock_waste_registered`. Si cada merma emitiera los dos eventos, cualquier suma de salidas por local contaría dos veces las pérdidas. Se decidió que **son excluyentes por orden**: una salida con `reason = consumption` emite solo `outbound_order_created`, y una con `reason = waste` emite solo `stock_waste_registered`, ambas con el mismo `outbound_order_id`. El total de salidas por local es la suma de ambos eventos y el reporte puede unir cada uno con su fila de base de datos.
+
+### Resumen de cifras
+
+| Concepto | Valor |
+|---|---|
+| Eventos diseñados | 21 |
+| Obligatorios del BRIEFING | 6 |
+| Identificados por nosotros | 15 |
+| Categorías cubiertas | 5 (negocio, autenticación, rendimiento, errores, navegación) |
+| Eventos en stream / batch | 3 / 18 |
+| Eventos con allowlist de propiedades | 21 de 21 |
