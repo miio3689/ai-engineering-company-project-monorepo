@@ -1,16 +1,24 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import dynamic from "next/dynamic";
+import { useState } from "react";
 
 import { updateSupplierRate, updateSupplierStatus } from "@/services/suppliers";
 import { SupplierStatus, type Supplier } from "@/types/supplier";
+
+const SupplierRateEditor = dynamic(() => import("@/components/supplier-rate-editor"), {
+  loading: () => (
+    <div className="grid min-h-[11.25rem] min-w-48 content-start gap-2" role="status" aria-busy="true">
+      <span className="sr-only">Cargando editor de tarifa…</span>
+    </div>
+  ),
+});
 
 export default function SupplierActions({ supplier, onSaved }: {
   supplier: Supplier;
   onSaved: (supplier: Supplier) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [rate, setRate] = useState(String(supplier.rate_per_unit));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -32,33 +40,28 @@ export default function SupplierActions({ supplier, onSaved }: {
     }
   }
 
-  function submitRate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const value = Number(rate);
-    if (!rate.trim() || !Number.isFinite(value) || value <= 0) {
-      setSuccess(null);
-      setError("La tarifa debe ser un número mayor que cero.");
-      return;
-    }
-    void save(() => updateSupplierRate(supplier.id, value), "Tarifa actualizada.");
-  }
-
   return (
     <div className="grid min-w-48 gap-2">
       {editing ? (
-        <form noValidate onSubmit={submitRate} className="grid gap-2">
-          <label htmlFor={`supplier-rate-${supplier.id}`}>Nueva tarifa ({supplier.currency})</label>
-          <input id={`supplier-rate-${supplier.id}`} type="number" step="any" required
-            value={rate} onChange={(event) => setRate(event.target.value)} disabled={busy}
-            aria-invalid={Boolean(error)} aria-describedby={error ? `supplier-action-error-${supplier.id}` : undefined}
-            className="min-h-11 w-full rounded-lg border border-gray-400 px-3 focus-visible:outline-2 focus-visible:outline-offset-2" />
-          <button type="submit" disabled={busy} className={buttonClass}>Guardar tarifa</button>
-          <button type="button" disabled={busy} className={buttonClass} onClick={() => { setEditing(false); setError(null); }}>Cancelar</button>
-        </form>
+        <SupplierRateEditor
+          supplier={supplier}
+          busy={busy}
+          error={error}
+          buttonClass={buttonClass}
+          onCancel={() => { setEditing(false); setError(null); }}
+          onInvalid={() => {
+            setSuccess(null);
+            setError("La tarifa debe ser un número mayor que cero.");
+          }}
+          onSubmit={(rate) => void save(
+            () => updateSupplierRate(supplier.id, rate),
+            "Tarifa actualizada.",
+          )}
+        />
       ) : (
         <button type="button" disabled={busy} className={buttonClass}
           aria-label={`Editar tarifa de ${supplier.name}`}
-          onClick={() => { setRate(String(supplier.rate_per_unit)); setEditing(true); setError(null); setSuccess(null); }}>
+          onClick={() => { setEditing(true); setError(null); setSuccess(null); }}>
           Editar tarifa
         </button>
       )}
