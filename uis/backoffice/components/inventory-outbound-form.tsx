@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { useInventoryIngredientStock } from "@/hooks/use-inventory-ingredient-stock";
 import { useInventoryProducts } from "@/hooks/use-inventory-products";
+import { useFlowAbandonment } from "@/hooks/use-flow-abandonment";
 import { useSubmissionLock } from "@/hooks/use-submission-lock";
 import {
   getLocationStock,
@@ -13,6 +14,12 @@ import {
   isQuantityAboveLocationStock,
   STOCK_LEVEL_PRESENTATION,
 } from "@/lib/inventory-stock";
+import {
+  trackInventoryValidationFailed,
+  trackOutboundCreated,
+  trackOutboundRejected,
+  type WasteReason,
+} from "@/lib/inventory-telemetry";
 import { createOutboundOrder, InventoryServiceError } from "@/services/inventory";
 import {
   EXIT_REASON_LABELS,
@@ -25,6 +32,7 @@ interface FormValues {
   ingredientId: string;
   quantity: string;
   reason: ExitReason;
+  wasteReason: WasteReason | "";
   locationId: string;
 }
 
@@ -48,6 +56,7 @@ const INITIAL_VALUES: FormValues = {
   ingredientId: "",
   quantity: "",
   reason: "consumption",
+  wasteReason: "",
   locationId: "",
 };
 
@@ -64,6 +73,7 @@ function formatQuantityUnit(quantity: number, unit: string): string {
 }
 
 export default function InventoryOutboundForm() {
+  const abandonment = useFlowAbandonment("outbound_order");
   const searchParams = useSearchParams();
   const { ingredients, loading, error: ingredientsError, retry } = useInventoryProducts();
   const [values, setValues] = useState<FormValues>(() => ({
@@ -93,7 +103,21 @@ export default function InventoryOutboundForm() {
     field: Field,
     value: FormValues[Field],
   ) {
-    setValues((current) => ({ ...current, [field]: value }));
+    const updatedValues = {
+      ...values,
+      [field]: value,
+      ...(field === "reason" && value === "consumption" ? { wasteReason: "" } : {}),
+    };
+    abandonment.fieldEdited(
+      [updatedValues.ingredientId, updatedValues.quantity, updatedValues.locationId,
+        ...(updatedValues.reason === "waste" ? [updatedValues.wasteReason] : [])]
+        .filter((fieldValue) => fieldValue.trim() !== "").length,
+    );
+    setValues((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "reason" && value === "consumption" ? { wasteReason: "" } : {}),
+    }));
     setFieldErrors((current) => {
       const next = { ...current };
       delete next[field];
@@ -120,6 +144,10 @@ export default function InventoryOutboundForm() {
       errors.reason = "Selecciona un motivo válido.";
     }
 
+    if (values.reason === "waste" && !values.wasteReason) {
+      errors.wasteReason = "Selecciona el motivo de la merma.";
+    }
+
     const locationId = Number(values.locationId);
     if (!LOCATION_IDS.some((id) => id === locationId)) {
       errors.locationId = "Selecciona un local.";
@@ -137,6 +165,12 @@ export default function InventoryOutboundForm() {
 
     const validationErrors = validate();
     if (Object.keys(validationErrors).length) {
+      abandonment.validationFailed();
+      trackInventoryValidationFailed(
+        "outbound_order",
+        validationErrors,
+        Number(values.locationId) || undefined,
+      );
       setFieldErrors(validationErrors);
       setError("Revisa los campos señalados antes de registrar la salida.");
       return;
@@ -155,13 +189,26 @@ export default function InventoryOutboundForm() {
         reason: values.reason,
         location_id: Number(values.locationId),
       };
+      const stockBefore = stock.ingredient && selectedLocationId !== null
+        ? getLocationStock(stock.ingredient, selectedLocationId)
+        : null;
 
       try {
-        await createOutboundOrder(input);
+        abandonment.submitStarted();
+        const order = await createOutboundOrder(input);
+        abandonment.completed();
+        trackOutboundCreated(
+          ingredient,
+          input,
+          order,
+          values.reason === "waste" && values.wasteReason ? values.wasteReason : null,
+          stockBefore,
+        );
         setValues((current) => ({
           ...current,
           quantity: "",
           reason: "consumption",
+          wasteReason: "",
           locationId: "",
         }));
         setFieldErrors({});
@@ -174,6 +221,9 @@ export default function InventoryOutboundForm() {
         });
         stock.refresh();
       } catch (caught) {
+        if (caught instanceof InventoryServiceError) {
+          trackOutboundRejected(ingredient, input, caught, stockBefore);
+        }
         if (caught instanceof InventoryServiceError && caught.status === 400) {
           setQuantityApiError(caught.message);
           stock.refresh();
@@ -339,6 +389,36 @@ export default function InventoryOutboundForm() {
               </span>
             )}
           </label>
+
+          {values.reason === "waste" && (
+            <label className="grid gap-2 font-semibold" htmlFor="wasteReason">
+              Motivo de la merma *
+              <select
+                id="wasteReason"
+                name="wasteReason"
+                value={values.wasteReason}
+                onChange={(event) => updateField(
+                  "wasteReason",
+                  (["expired", "kitchen_error", "theft_suspected"] as const)
+                    .find((reason) => reason === event.target.value) ?? "",
+                )}
+                className={fieldClass}
+                required
+                aria-invalid={Boolean(fieldErrors.wasteReason)}
+                aria-describedby={fieldDescription("wasteReason")}
+              >
+                <option value="">Selecciona el motivo de la merma</option>
+                <option value="expired">Vencido</option>
+                <option value="kitchen_error">Error de cocina</option>
+                <option value="theft_suspected">Pérdida o robo sospechoso</option>
+              </select>
+              {fieldErrors.wasteReason && (
+                <span id="wasteReason-error" className="font-normal text-red-800">
+                  {fieldErrors.wasteReason}
+                </span>
+              )}
+            </label>
+          )}
 
           <label className="grid gap-2 font-semibold" htmlFor="locationId">
             Local *

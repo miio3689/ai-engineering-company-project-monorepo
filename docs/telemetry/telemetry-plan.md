@@ -136,7 +136,7 @@ Todo evento, sin excepción, lleva este envelope. Los campos propios de cada eve
 | `eventId` | UUID | Sí | Identificador único del evento; permite deduplicar reenvíos |
 | `timestamp` | texto ISO 8601 en UTC | Sí | Momento en que ocurrió el hecho (no el de envío) |
 | `sessionId` | UUID | Sí | Sesión del navegador; lo genera el frontend y viaja en `X-Session-Id` |
-| `userId` | UUID o `anonymous` | Sí | Identificador interno del usuario (el UUID de cuenta que ya se guarda en las órdenes como `user_uuid`). Antes de iniciar sesión vale `anonymous` |
+| `userId` | texto numérico o `anonymous` | Sí | Identificador interno de la cuenta: el mismo valor que el sistema ya guarda en las órdenes como `user_uuid`, que en el código real es un entero (por ejemplo `"42"`). Antes de iniciar sesión vale `anonymous` |
 | `event_type` | texto `entidad_acción` | Sí | Tipo de evento; patrón `^[a-z]+(_[a-z]+)+$` |
 | `schemaVersion` | texto `mayor.menor.parche` | Sí | Versión del esquema del evento; empieza en `1.0.0` |
 | `requestId` | UUID o `none` | Sí | Correlación frontend–backend–logs (`X-Request-Id`). Vale `none` en eventos que no nacen de una petición concreta (agregados y métricas del navegador) |
@@ -149,7 +149,7 @@ Ejemplo:
   "eventId": "7d1f6a52-3c0e-4b8a-9d2e-5f4c1a9b8e70",
   "timestamp": "2026-11-15T14:32:08.120Z",
   "sessionId": "0b9a3c4e-6d1f-4e2a-8c57-1f3e9a7b2d64",
-  "userId": "c3e8a1d2-9f47-4b6c-a05e-2d7b8c1f4e93",
+  "userId": "42",
   "event_type": "inbound_order_created",
   "schemaVersion": "1.0.0",
   "requestId": "a41c5e77-2b9d-4f08-b3a6-8e0d7c2f1a55",

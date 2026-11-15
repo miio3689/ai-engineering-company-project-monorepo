@@ -23,12 +23,16 @@ export const STOCK_LEVEL_PRESENTATION: Record<
   },
 };
 
+export function getLowStockThreshold(unit: IngredientUnit): number {
+  return unit === "unidad" ? 50 : 20;
+}
+
 // kg/litro: bajo < 20, medio < 50 y saludable >= 50; unidad: bajo < 50, medio < 150 y saludable >= 150.
 export function getStockLevel(
   unit: IngredientUnit,
   currentStock: number,
 ): StockLevel {
-  const lowThreshold = unit === "unidad" ? 50 : 20;
+  const lowThreshold = getLowStockThreshold(unit);
   const healthyThreshold = unit === "unidad" ? 150 : 50;
 
   if (currentStock < lowThreshold) return "low";

@@ -1,0 +1,25 @@
+// Generado a partir de docs/telemetry/event-schemas.json. No editar a mano.
+// Allowlist de propiedades por evento (docs/telemetry/telemetry-plan.md, sección 7).
+export const TELEMETRY_ALLOWLIST: Record<string, readonly string[]> = {
+  inbound_order_created: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "inbound_order_id", "supplier_name", "unit_cost"],
+  outbound_order_created: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "outbound_order_id"],
+  stock_waste_registered: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "outbound_order_id", "reason"],
+  stock_threshold_triggered: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "threshold_quantity", "triggering_outbound_order_id"],
+  direct_stock_edit_rejected: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "attempted_operation", "rejection_reason"],
+  ingredient_price_variance_detected: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "inbound_order_id", "supplier_name", "unit_cost", "baseline_unit_cost", "variance_pct", "threshold_pct"],
+  outbound_order_rejected: ["location_id", "country", "currency", "product_id", "product_category", "quantity", "unit", "available_quantity", "rejection_reason"],
+  product_created: ["product_id", "product_category", "unit", "country"],
+  inventory_form_validation_failed: ["form", "field_name", "error_code", "location_id"],
+  supplier_rate_changed: ["supplier_id", "country", "currency", "new_rate"],
+  incident_created: ["incident_id", "category", "status"],
+  login_succeeded: ["auth_method"],
+  login_failed: ["failure_reason", "attempt_number_in_session"],
+  session_expired: ["expiry_cause", "last_route"],
+  password_changed: ["method"],
+  api_latency_recorded: ["method", "route_template", "status_class", "window_start", "window_seconds", "request_count", "p50_ms", "p95_ms", "max_ms"],
+  page_load_measured: ["route_template", "navigation_type", "load_ms", "lcp_ms"],
+  api_error_returned: ["method", "route_template", "status_code", "error_category"],
+  frontend_error_captured: ["error_name", "error_fingerprint", "route_template", "handled"],
+  page_viewed: ["route_template", "section", "referrer_route"],
+  flow_abandoned: ["flow", "last_step_reached", "elapsed_ms", "fields_filled_count"],
+};

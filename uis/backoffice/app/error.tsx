@@ -1,13 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
+
+import { reportFrontendError } from "@/lib/telemetry-errors";
 
 interface ErrorPageProps {
   error: Error;
   reset: () => void;
 }
 
-export default function ErrorPage({ reset }: ErrorPageProps) {
+export default function ErrorPage({ error, reset }: ErrorPageProps) {
+  useEffect(() => {
+    reportFrontendError(error, true);
+  }, [error]);
+
   return (
     <main className="mx-auto my-10 grid w-[92%] max-w-2xl gap-4 rounded-2xl border border-red-300 bg-red-50 p-6 text-gray-900">
       <h1 className="text-2xl font-bold">No se pudo cargar esta página</h1>

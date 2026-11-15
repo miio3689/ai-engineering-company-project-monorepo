@@ -29,6 +29,7 @@ from services.api.routes.incidents import router as incidents_router  # noqa: E4
 from services.api.routes.inventory import router as inventory_router  # noqa: E402
 from services.api.routes.profiles import router as profiles_router  # noqa: E402
 from services.api.routes.suppliers import router as suppliers_router  # noqa: E402
+from services.api.routes.telemetry import router as telemetry_router  # noqa: E402
 from services.api.routes.users import router as users_router  # noqa: E402
 from services.api.auth_security import get_current_user  # noqa: E402
 from services.api.inventory.database import init_inventory_db  # noqa: E402
@@ -72,6 +73,7 @@ app.include_router(inventory_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(profiles_router)
+app.include_router(telemetry_router)
 allowed_origins = [
     origin.strip()
     for origin in os.getenv(

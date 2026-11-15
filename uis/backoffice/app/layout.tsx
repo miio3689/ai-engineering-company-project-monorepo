@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import AuthGuard from "@/components/auth-guard";
 import BackofficeNavigation from "@/components/backoffice-navigation";
+import TelemetryProvider from "@/components/telemetry-provider";
 
 import "./globals.css";
 
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="es">
       <body>
+        <TelemetryProvider />
         <AuthGuard>
           <BackofficeNavigation />
           {children}
