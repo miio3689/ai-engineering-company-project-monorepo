@@ -125,3 +125,139 @@ Comprobadas leyendo el código. Ninguna se corrige en este proyecto: solo se doc
 | B6 | No hay correlación entre frontend, backend y logs | No aparece `request_id`, `X-Request-Id` ni `sessionId` en ningún `.py`, `.ts` ni `.tsx` | Cabeceras `X-Request-Id` y `X-Session-Id` y su lectura en el middleware (también en la configuración CORS) |
 | B7 | No hay canal ni almacén de eventos | Hoy solo existe el log `api.timing` | Un endpoint de ingestión para eventos del frontend y un destino de almacenamiento (proyectos posteriores) |
 | B8 | Valores distintos para lo mismo | Proveedores usan país `Colombia`/`USA` y categorías en inglés; el BRIEFING usa `CO`/`US` | El plan fija `CO`/`US` y las categorías `meat`, `produce`, `sauce`, `beverage`, `packaging`, `cleaning`, con tabla de equivalencias |
+
+
+## 6. Event Envelope
+
+Todo evento, sin excepción, lleva este envelope. Los campos propios de cada evento van solo dentro de `properties`.
+
+| Campo | Tipo | Obligatorio | Descripción |
+|---|---|---|---|
+| `eventId` | UUID | Sí | Identificador único del evento; permite deduplicar reenvíos |
+| `timestamp` | texto ISO 8601 en UTC | Sí | Momento en que ocurrió el hecho (no el de envío) |
+| `sessionId` | UUID | Sí | Sesión del navegador; lo genera el frontend y viaja en `X-Session-Id` |
+| `userId` | UUID o `anonymous` | Sí | Identificador interno del usuario (el UUID de cuenta que ya se guarda en las órdenes como `user_uuid`). Antes de iniciar sesión vale `anonymous` |
+| `event_type` | texto `entidad_acción` | Sí | Tipo de evento; patrón `^[a-z]+(_[a-z]+)+$` |
+| `schemaVersion` | texto `mayor.menor.parche` | Sí | Versión del esquema del evento; empieza en `1.0.0` |
+| `requestId` | UUID o `none` | Sí | Correlación frontend–backend–logs (`X-Request-Id`). Vale `none` en eventos que no nacen de una petición concreta (agregados y métricas del navegador) |
+| `properties` | objeto | Sí | Payload específico, limitado por la allowlist del evento |
+
+Ejemplo:
+
+```json
+{
+  "eventId": "7d1f6a52-3c0e-4b8a-9d2e-5f4c1a9b8e70",
+  "timestamp": "2026-11-15T14:32:08.120Z",
+  "sessionId": "0b9a3c4e-6d1f-4e2a-8c57-1f3e9a7b2d64",
+  "userId": "c3e8a1d2-9f47-4b6c-a05e-2d7b8c1f4e93",
+  "event_type": "inbound_order_created",
+  "schemaVersion": "1.0.0",
+  "requestId": "a41c5e77-2b9d-4f08-b3a6-8e0d7c2f1a55",
+  "properties": {
+    "location_id": 3,
+    "country": "CO",
+    "product_id": 12,
+    "product_category": "meat",
+    "quantity": 25.5,
+    "unit": "kg",
+    "currency": "COP",
+    "inbound_order_id": 481,
+    "supplier_name": "Proveedor Ejemplo"
+  }
+}
+```
+
+Reglas del envelope:
+
+- El servidor es la fuente de verdad del `timestamp` en eventos de backend; el navegador usa su reloj solo en eventos de frontend.
+- `eventId` se genera una sola vez por evento. Si un envío se reintenta, el `eventId` no cambia.
+- La versión del esquema sube la parte menor al añadir propiedades opcionales y la mayor al cambiar o quitar una existente.
+- La taxonomía es `entidad_acción` con verbos en participio o equivalentes coherentes: `_created`, `_rejected`, `_triggered`, `_registered`, `_detected`, `_changed`, `_viewed`, `_failed`, `_succeeded`, `_expired`, `_captured`, `_recorded`, `_measured`, `_abandoned`, `_returned`.
+
+## 7. Esquemas y allowlists
+
+La allowlist de cada evento es la lista cerrada de claves permitidas en `properties`. **Cualquier clave fuera de la lista se descarta y el evento se rechaza** (`additionalProperties: false` en `event-schemas.json`).
+
+### 7.1 Diccionario de propiedades comunes
+
+| Propiedad | Tipo y valores | Descripción |
+|---|---|---|
+| `location_id` | entero 1 a 14 | Local, igual que la restricción de base de datos |
+| `country` | `CO` o `US` | País del **local** (derivado del mapa local→país, brecha B3). No depende del idioma de la interfaz |
+| `currency` | `COP` o `USD` | Moneda del local; se deriva del país y no se convierte nunca |
+| `product_id` | entero ≥ 1 | Identificador del ingrediente |
+| `product_category` | `meat`, `produce`, `sauce`, `beverage`, `packaging`, `cleaning` | Categoría del ingrediente tal como la guarda el sistema |
+| `quantity` | número ≥ 0 | Cantidad en la `unit` indicada |
+| `unit` | `kg`, `litro`, `unidad` | Unidad del producto |
+| `supplier_name` | texto 1 a 120 | Nombre comercial del proveedor (empresa, no persona) |
+| `route_template` | texto que empieza por `/` | Ruta con parámetros sin sustituir, por ejemplo `/inventory/products/{ingredient_id}`. **Nunca la URL completa ni su query string** |
+
+### 7.2 Allowlist por evento
+
+Las propiedades obligatorias van en la columna 2; las opcionales, en la 3. Los siete campos mínimos del BRIEFING son `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit` y `currency`.
+
+| `event_type` | Obligatorias | Opcionales |
+|---|---|---|
+| `inbound_order_created` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `inbound_order_id`, `supplier_name` | `unit_cost` |
+| `outbound_order_created` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `outbound_order_id` | — |
+| `stock_waste_registered` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `outbound_order_id`, `reason` | — |
+| `stock_threshold_triggered` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `threshold_quantity`, `triggering_outbound_order_id` | — |
+| `direct_stock_edit_rejected` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `attempted_operation`, `rejection_reason` | — |
+| `ingredient_price_variance_detected` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `inbound_order_id`, `supplier_name`, `unit_cost`, `baseline_unit_cost`, `variance_pct`, `threshold_pct` | — |
+| `outbound_order_rejected` | `location_id`, `country`, `currency`, `product_id`, `quantity`, `rejection_reason` | `product_category`, `unit`, `available_quantity` |
+| `product_created` | `product_id`, `product_category`, `unit`, `country` | — |
+| `inventory_form_validation_failed` | `form`, `field_name`, `error_code` | `location_id` |
+| `supplier_rate_changed` | `supplier_id`, `country`, `currency`, `new_rate` | — |
+| `incident_created` | `incident_id`, `category`, `status` | — |
+| `login_succeeded` | `auth_method` | — |
+| `login_failed` | `failure_reason`, `attempt_number_in_session` | — |
+| `session_expired` | `expiry_cause`, `last_route` | — |
+| `password_changed` | `method` | — |
+| `api_latency_recorded` | `method`, `route_template`, `status_class`, `window_start`, `window_seconds`, `request_count`, `p50_ms`, `p95_ms`, `max_ms` | — |
+| `page_load_measured` | `route_template`, `navigation_type`, `load_ms` | `lcp_ms` |
+| `api_error_returned` | `method`, `route_template`, `status_code`, `error_category` | — |
+| `frontend_error_captured` | `error_name`, `error_fingerprint`, `route_template`, `handled` | — |
+| `page_viewed` | `route_template`, `section` | `referrer_route` |
+| `flow_abandoned` | `flow`, `last_step_reached`, `elapsed_ms`, `fields_filled_count` | — |
+
+### 7.3 Descripción de propiedades específicas
+
+| Propiedad | Evento(s) | Tipo y significado |
+|---|---|---|
+| `inbound_order_id`, `outbound_order_id` | órdenes | Entero. Identificador de la orden; une el evento con la fila de base de datos |
+| `unit_cost` | entrada, variación de precio | Número > 0, en la `currency` del local. **Opcional hasta que el modelo guarde el coste (B1)** |
+| `baseline_unit_cost`, `variance_pct`, `threshold_pct` | variación de precio | Coste de referencia (media de las últimas 5 entradas del mismo producto y proveedor), variación en porcentaje y umbral aplicado (10) |
+| `reason` | merma | `expired`, `kitchen_error` o `theft_suspected` (requiere B2) |
+| `threshold_quantity` | umbral | Mínimo configurado para ese producto y local (requiere B4); `quantity` es el stock actual tras la orden |
+| `triggering_outbound_order_id` | umbral | Orden de salida que provocó el cruce |
+| `attempted_operation` | edición directa | `set_stock`, `adjust_stock` u `other`; `quantity` es la cantidad que se intentó fijar |
+| `rejection_reason` | edición directa | `direct_edit_not_allowed` o `forbidden_role` |
+| `rejection_reason` | salida rechazada | `insufficient_stock`, `ingredient_not_found`, `validation_error` o `database_error`; `available_quantity` es el stock disponible si se conoce |
+| `form` | validación de formulario | `inbound_order`, `outbound_order` o `product_create` |
+| `field_name`, `error_code` | validación de formulario | Nombre técnico del campo y código (`required`, `invalid_type`, `out_of_range`, `too_long`, `other`). Nunca el valor escrito |
+| `supplier_id`, `new_rate`, `country`, `currency` | tarifa de proveedor | Identificador del proveedor, nueva tarifa y país/moneda del proveedor, con el mapa `Colombia`→`CO`, `USA`→`US` (B8) |
+| `incident_id`, `category`, `status` | incidencia | Identificador, categoría y estado. **Nunca la descripción** |
+| `auth_method` | inicio de sesión | `password` |
+| `failure_reason`, `attempt_number_in_session` | login fallido | `invalid_credentials`, `validation_error` o `service_error`; contador de intentos en la sesión. **Nunca el usuario ni la contraseña** |
+| `expiry_cause`, `last_route` | sesión caducada | `token_expired` o `token_invalid`; ruta (plantilla) donde ocurrió |
+| `method` | cambio de contraseña | `change_password` o `reset_password` |
+| `method`, `status_class`, `window_start`, `window_seconds`, `request_count`, `p50_ms`, `p95_ms`, `max_ms` | latencia | Verbo HTTP, clase de estado (`2xx`, `3xx`, `4xx`, `5xx`), inicio y duración de la ventana (60 s) y estadísticas de esa ventana |
+| `navigation_type`, `load_ms`, `lcp_ms` | carga de página | `navigate`, `reload` o `back_forward`; milisegundos de carga y del elemento más grande visible |
+| `status_code`, `error_category` | error de API | Código 500 a 599 y `database_unavailable` o `internal_error` |
+| `error_name`, `error_fingerprint`, `handled` | error de frontend | Nombre del tipo de error, huella hash estable y si se capturó. **Sin mensaje ni traza** |
+| `section`, `referrer_route` | página vista | `home`, `inventory`, `suppliers`, `incidents`, `account`, `auth` o `candidates`; ruta de origen |
+| `flow`, `last_step_reached`, `elapsed_ms`, `fields_filled_count` | flujo abandonado | `inbound_order`, `outbound_order`, `incident_register` o `supplier_create`; último paso (`form_opened`, `field_edited`, `validation_failed`, `submit_started`), tiempo y **número** de campos rellenos (no su contenido) |
+
+### 7.4 Datos sensibles y PII
+
+| Dato | Tratamiento |
+|---|---|
+| `userId` | Identificador interno pseudónimo; **es dato personal indirecto**. Vive solo en el envelope, nunca en `properties`. Antes del login vale `anonymous` |
+| Email, nombre, contraseña, token | **Nunca se capturan**, tampoco en `login_failed` ni en `password_changed` |
+| Texto libre (descripción de incidencias, notas, mensajes de error) | Fuera de la allowlist; no se envía |
+| URL completa y query string | Se sustituye por `route_template`. Una URL puede contener datos escritos por el usuario (por ejemplo, credenciales si un formulario se envía por GET) |
+| Dirección IP y navegador | No se capturan |
+| `supplier_name` | Nombre comercial de empresa; no personal. Si un proveedor es una persona física, se sustituiría por `supplier_id` |
+| Importes y cantidades | Datos de negocio; se guardan en la moneda del local sin conversión |
+
+La anonimización se hace **antes de emitir**: la allowlist se aplica en el origen del evento, no al leerlo después. Para análisis, `userId` se puede agregar por local o rol sin exponerlo en informes.
