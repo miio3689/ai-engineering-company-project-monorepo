@@ -237,6 +237,7 @@ async def analyze_incidents(
 
 @app.get(
     "/api/incidents/results/export",
+    response_model=None,
     response_class=Response,
     responses={
         200: {
