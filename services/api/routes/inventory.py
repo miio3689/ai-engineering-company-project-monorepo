@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlmodel import Session, select
 
 from ..auth_security import get_current_user
+from ..cache import InProcessTTLCache
 from ..inventory.database import get_db
 from ..inventory.models import Ingredient, IngredientEntry, IngredientExit
 from ..inventory.schemas import (
@@ -25,6 +26,12 @@ from ..models import UserResponse
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 logger = logging.getLogger(__name__)
+PRODUCTS_CACHE_KEY = "inventory.products"
+ORDERS_CACHE_KEY = "inventory.orders"
+# Route writes explicitly invalidate these entries; 60 seconds is the freshness
+# backstop for external seed scripts while avoiding repeated aggregate queries.
+INVENTORY_CACHE_TTL_SECONDS = 60
+inventory_cache = InProcessTTLCache()
 
 
 def _database_error(session: Session, exc: SQLAlchemyError) -> HTTPException:
@@ -153,25 +160,32 @@ def _sort_timestamp(value: datetime) -> datetime:
 
 @router.get("/products", response_model=list[IngredientRead])
 def list_products(
-    session: Session = Depends(get_db),
     _current_user: UserResponse = Depends(get_current_user),
+    session: Session = Depends(get_db),
 ) -> list[IngredientRead]:
-    try:
-        rows = session.exec(_product_stock_statement()).all()
-        stock_by_ingredient = _stock_by_location(
-            session,
-            [ingredient.id for ingredient, _ in rows if ingredient.id is not None],
-        )
-    except SQLAlchemyError as exc:
-        raise _database_error(session, exc) from exc
-    return [
-        _ingredient_response(
-            ingredient,
-            stock,
-            stock_by_ingredient.get(ingredient.id, []),
-        )
-        for ingredient, stock in rows
-    ]
+    def load_products() -> list[IngredientRead]:
+        try:
+            rows = session.exec(_product_stock_statement()).all()
+            stock_by_ingredient = _stock_by_location(
+                session,
+                [ingredient.id for ingredient, _ in rows if ingredient.id is not None],
+            )
+        except SQLAlchemyError as exc:
+            raise _database_error(session, exc) from exc
+        return [
+            _ingredient_response(
+                ingredient,
+                stock,
+                stock_by_ingredient.get(ingredient.id, []),
+            )
+            for ingredient, stock in rows
+        ]
+
+    return inventory_cache.get_or_set(
+        PRODUCTS_CACHE_KEY,
+        INVENTORY_CACHE_TTL_SECONDS,
+        load_products,
+    )
 
 
 @router.post(
@@ -188,6 +202,7 @@ def create_product(
     session.add(ingredient)
     try:
         session.commit()
+        inventory_cache.invalidate(PRODUCTS_CACHE_KEY)
         session.refresh(ingredient)
     except SQLAlchemyError as exc:
         raise _database_error(session, exc) from exc
@@ -237,6 +252,8 @@ def create_inbound_order(
         )
         session.add(entry)
         session.commit()
+        inventory_cache.invalidate(PRODUCTS_CACHE_KEY)
+        inventory_cache.invalidate(ORDERS_CACHE_KEY)
         session.refresh(entry)
     except HTTPException:
         raise
@@ -311,6 +328,8 @@ def create_outbound_order(
         )
         session.add(exit_record)
         session.commit()
+        inventory_cache.invalidate(PRODUCTS_CACHE_KEY)
+        inventory_cache.invalidate(ORDERS_CACHE_KEY)
         session.refresh(exit_record)
     except HTTPException:
         raise
@@ -332,53 +351,64 @@ def create_outbound_order(
 
 @router.get("/orders", response_model=list[InventoryOrderRead])
 def list_orders(
-    session: Session = Depends(get_db),
     _current_user: UserResponse = Depends(get_current_user),
+    session: Session = Depends(get_db),
 ) -> list[InventoryOrderRead]:
-    try:
-        entries = session.exec(
-            select(IngredientEntry, Ingredient.name, Ingredient.sku).join(
-                Ingredient,
-                Ingredient.id == IngredientEntry.ingredient_id,
-            )
-        ).all()
-        exits = session.exec(
-            select(IngredientExit, Ingredient.name, Ingredient.sku).join(
-                Ingredient,
-                Ingredient.id == IngredientExit.ingredient_id,
-            )
-        ).all()
-    except SQLAlchemyError as exc:
-        raise _database_error(session, exc) from exc
+    def load_orders() -> list[InventoryOrderRead]:
+        try:
+            entries = session.exec(
+                select(IngredientEntry, Ingredient.name, Ingredient.sku).join(
+                    Ingredient,
+                    Ingredient.id == IngredientEntry.ingredient_id,
+                )
+            ).all()
+            exits = session.exec(
+                select(IngredientExit, Ingredient.name, Ingredient.sku).join(
+                    Ingredient,
+                    Ingredient.id == IngredientExit.ingredient_id,
+                )
+            ).all()
+        except SQLAlchemyError as exc:
+            raise _database_error(session, exc) from exc
 
-    orders: list[InventoryOrderRead] = [
-        InboundOrderRead(
-            id=entry.id,
-            type="inbound",
-            ingredient_id=entry.ingredient_id,
-            name=name,
-            sku=sku,
-            quantity=entry.quantity,
-            location_id=entry.location_id,
-            created_at=entry.created_at,
-            user_uuid=entry.user_uuid,
-            supplier_name=entry.supplier_name,
+        orders: list[InventoryOrderRead] = [
+            InboundOrderRead(
+                id=entry.id,
+                type="inbound",
+                ingredient_id=entry.ingredient_id,
+                name=name,
+                sku=sku,
+                quantity=entry.quantity,
+                location_id=entry.location_id,
+                created_at=entry.created_at,
+                user_uuid=entry.user_uuid,
+                supplier_name=entry.supplier_name,
+            )
+            for entry, name, sku in entries
+        ]
+        orders.extend(
+            OutboundOrderRead(
+                id=exit_record.id,
+                type="outbound",
+                ingredient_id=exit_record.ingredient_id,
+                name=name,
+                sku=sku,
+                quantity=exit_record.quantity,
+                location_id=exit_record.location_id,
+                created_at=exit_record.created_at,
+                user_uuid=exit_record.user_uuid,
+                reason=exit_record.reason,
+            )
+            for exit_record, name, sku in exits
         )
-        for entry, name, sku in entries
-    ]
-    orders.extend(
-        OutboundOrderRead(
-            id=exit_record.id,
-            type="outbound",
-            ingredient_id=exit_record.ingredient_id,
-            name=name,
-            sku=sku,
-            quantity=exit_record.quantity,
-            location_id=exit_record.location_id,
-            created_at=exit_record.created_at,
-            user_uuid=exit_record.user_uuid,
-            reason=exit_record.reason,
+        return sorted(
+            orders,
+            key=lambda order: _sort_timestamp(order.created_at),
+            reverse=True,
         )
-        for exit_record, name, sku in exits
+
+    return inventory_cache.get_or_set(
+        ORDERS_CACHE_KEY,
+        INVENTORY_CACHE_TTL_SECONDS,
+        load_orders,
     )
-    return sorted(orders, key=lambda order: _sort_timestamp(order.created_at), reverse=True)

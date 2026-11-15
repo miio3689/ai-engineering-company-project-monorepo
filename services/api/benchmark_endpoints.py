@@ -21,6 +21,11 @@ import sqlite3
 from fastapi.testclient import TestClient
 
 from services.api.app.main import app
+from services.api.routes.inventory import (
+    ORDERS_CACHE_KEY,
+    PRODUCTS_CACHE_KEY,
+    inventory_cache,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -145,9 +150,13 @@ class BenchmarkRunner:
         calls: int,
         client: TestClient,
         auth_headers: dict[str, str] | None = None,
+        invalidate_cache_key: str | None = None,
+        cache_mode: str = "not measured",
     ) -> dict[str, Any]:
         """Discard one warm-up request, then measure every successful call."""
         def request_once():
+            if invalidate_cache_key is not None:
+                inventory_cache.invalidate(invalidate_cache_key)
             response = client.request(method, path, headers=auth_headers or {})
             if not 200 <= response.status_code < 300:
                 raise RuntimeError(f"HTTP {response.status_code}")
@@ -185,6 +194,8 @@ class BenchmarkRunner:
             "mean_ms": statistics.mean(times),
             "median_ms": statistics.median(times),
             "p95_ms": ordered_times[p95_index],
+            "cache_mode": cache_mode,
+            "mean_improvement_pct": 0.0,
         }
     
     def run(self, calls: int = 10):
@@ -202,6 +213,7 @@ class BenchmarkRunner:
         
         # Patch database paths and create client
         import services.api.database as db_module
+        import services.api.inventory.database as inventory_db_module
         import services.api.services_auth as auth_module
         from services.api.auth_security import get_current_user
         from services.api.models import UserResponse, UserRole
@@ -209,7 +221,12 @@ class BenchmarkRunner:
         with patch.object(db_module, "INCIDENTS_DATABASE_PATH", incidents_path):
             with patch.object(db_module, "DATABASE_PATH", suppliers_path):
                 with patch.object(auth_module, "AUTH_DATABASE_PATH", auth_path):
-                    with patch.dict(os.environ, {"DATABASE_URL": inventory_db_url}):
+                    with patch.object(
+                        inventory_db_module, "_engine", None
+                    ), patch.dict(
+                        os.environ,
+                        {"DATABASE_URL": inventory_db_url},
+                    ):
                         # Override get_current_user
                         test_user = UserResponse(
                             id=1,
@@ -239,9 +256,7 @@ class BenchmarkRunner:
                                     ("GET", "/api/incidents?status=open&origin=customer&branch=central", None),
                                     ("GET", "/api/incidents/summary", None),
                                     ("GET", "/suppliers", None),
-                                    ("GET", "/inventory/products", None),
                                     ("GET", "/inventory/products/1", None),
-                                    ("GET", "/inventory/orders", None),
                                     ("GET", "/auth/me", auth_headers),
                                     ("GET", "/profiles/me", auth_headers),
                                     ("GET", "/users", None),
@@ -257,6 +272,41 @@ class BenchmarkRunner:
                                               f"mean: {result['mean_ms']:7.2f}ms | "
                                               f"median: {result['median_ms']:7.2f}ms | "
                                               f"p95: {result['p95_ms']:7.2f}ms")
+
+                                for path, key in (
+                                    ("/inventory/products", PRODUCTS_CACHE_KEY),
+                                    ("/inventory/orders", ORDERS_CACHE_KEY),
+                                ):
+                                    uncached = self.benchmark_endpoint(
+                                        "GET",
+                                        path,
+                                        calls,
+                                        client,
+                                        invalidate_cache_key=key,
+                                        cache_mode="without cache",
+                                    )
+                                    cached = self.benchmark_endpoint(
+                                        "GET",
+                                        path,
+                                        calls,
+                                        client,
+                                        cache_mode="cache hit",
+                                    )
+                                    cached["mean_improvement_pct"] = (
+                                        (uncached["mean_ms"] - cached["mean_ms"])
+                                        / uncached["mean_ms"]
+                                        * 100
+                                    )
+                                    results.extend((uncached, cached))
+                                    for result in (uncached, cached):
+                                        logger.info(
+                                            f"  GET  {path:75} "
+                                            f"{result['cache_mode']:14} "
+                                            f"n={result['n']:3} | "
+                                            f"mean: {result['mean_ms']:7.2f}ms | "
+                                            f"median: {result['median_ms']:7.2f}ms | "
+                                            f"p95: {result['p95_ms']:7.2f}ms"
+                                        )
                                 
                                 table_counts = self.get_table_counts()
                                 # Print summary table
@@ -277,15 +327,21 @@ class BenchmarkRunner:
             logger.info(f"  {table:20} {count:8} rows")
         
         logger.info("\nEndpoint Performance (milliseconds):")
-        logger.info(f"{'Method':<6} {'Path':<70} {'n':>4} {'Min':>9} {'Mean':>9} {'Median':>9} {'P95':>9} {'Max':>9}")
+        logger.info(
+            f"{'Method':<6} {'Path':<55} {'Cache mode':<16} {'n':>4} "
+            f"{'Min':>9} {'Mean':>9} {'Median':>9} {'P95':>9} {'Max':>9} "
+            f"{'Mean improvement':>17}"
+        )
         logger.info("-" * 135)
         
         for result in results:
             logger.info(
-                f"{result['method']:<6} {result['path']:<70} {result['n']:>4} "
+                f"{result['method']:<6} {result['path']:<55} "
+                f"{result['cache_mode']:<16} {result['n']:>4} "
                 f"{result['min_ms']:>9.2f} {result['mean_ms']:>9.2f} "
                 f"{result['median_ms']:>9.2f} {result['p95_ms']:>9.2f} "
-                f"{result['max_ms']:>9.2f}"
+                f"{result['max_ms']:>9.2f} "
+                f"{result['mean_improvement_pct']:>16.2f}%"
             )
         
         logger.info("="*120 + "\n")
@@ -298,17 +354,22 @@ def main():
     parser = argparse.ArgumentParser(description="Benchmark API endpoints")
     parser.add_argument("--output-dir", type=str, required=True, help="Directory for test data")
     parser.add_argument("--calls", type=int, default=30, help="Measured calls per endpoint (minimum 30)")
-    parser.add_argument("--volume", choices=["small", "large"], default="small", help="Data volume size")
+    parser.add_argument(
+        "--volume",
+        choices=["small", "large", "both"],
+        default="both",
+        help="Data volume size (default: both)",
+    )
     
     args = parser.parse_args()
     
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    runner = BenchmarkRunner(output_dir, args.volume)
-    
     try:
-        runner.run(args.calls)
+        volumes = ("small", "large") if args.volume == "both" else (args.volume,)
+        for volume in volumes:
+            BenchmarkRunner(output_dir, volume).run(args.calls)
         return 0
     except Exception as exc:
         logger.error(f"Benchmark failed: {exc}", exc_info=True)

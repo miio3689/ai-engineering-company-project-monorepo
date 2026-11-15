@@ -13,6 +13,10 @@ from sqlalchemy.pool import StaticPool
 
 from services.api import services_auth
 from services.api.app import main
+from services.api.routes.inventory import (
+    INVENTORY_CACHE_TTL_SECONDS,
+    inventory_cache,
+)
 from services.api.inventory.database import get_db
 from services.api.inventory.models import Ingredient, IngredientEntry, IngredientExit
 
@@ -28,6 +32,8 @@ PRODUCT = {
 
 class InventoryRoutesTests(unittest.TestCase):
     def setUp(self):
+        inventory_cache.clear()
+        self.addCleanup(inventory_cache.clear)
         self.temporary = TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.database_url_patch = patch.dict(os.environ, {"DATABASE_URL": ""})
@@ -669,12 +675,186 @@ class InventoryRoutesTests(unittest.TestCase):
             self.assertEqual(order["name"], PRODUCT["name"])
             self.assertEqual(order["sku"], PRODUCT["sku"])
 
+    def test_second_products_and_orders_reads_skip_database_queries(self):
+        self._seed_ingredients_and_movements(1)
+        products_first = self._count_select_queries("/inventory/products")
+        orders_first = self._count_select_queries("/inventory/orders")
+        products_second = self._count_select_queries("/inventory/products")
+        orders_second = self._count_select_queries("/inventory/orders")
+
+        self.assertEqual(products_first, 3)
+        self.assertEqual(orders_first, 2)
+        self.assertEqual(products_second, 0)
+        self.assertEqual(orders_second, 0)
+
+    def test_product_create_invalidates_warm_products_cache(self):
+        initial = self.client.get("/inventory/products", headers=self.headers)
+        self.assertEqual(initial.json(), [])
+
+        created = self.create_product()
+
+        listed = self.client.get("/inventory/products", headers=self.headers)
+        self.assertEqual([item["id"] for item in listed.json()], [created["id"]])
+
+    def test_inbound_invalidates_product_and_order_caches(self):
+        product = self.create_product()
+        self.client.get("/inventory/products", headers=self.headers)
+        self.assertEqual(
+            self.client.get("/inventory/orders", headers=self.headers).json(),
+            [],
+        )
+
+        inbound = self.client.post(
+            "/inventory/orders/inbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 7,
+                "supplier_name": "Proveedor",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(inbound.status_code, 201, inbound.text)
+        listed_product = self.client.get(
+            "/inventory/products",
+            headers=self.headers,
+        ).json()[0]
+        listed_orders = self.client.get(
+            "/inventory/orders",
+            headers=self.headers,
+        ).json()
+        self.assertEqual(listed_product["current_stock"], 7)
+        self.assertEqual([order["id"] for order in listed_orders], [inbound.json()["id"]])
+
+    def test_outbound_invalidates_product_and_order_caches(self):
+        product = self.create_product()
+        self.client.post(
+            "/inventory/orders/inbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 7,
+                "supplier_name": "Proveedor",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.client.get("/inventory/products", headers=self.headers)
+        self.client.get("/inventory/orders", headers=self.headers)
+
+        outbound = self.client.post(
+            "/inventory/orders/outbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 2,
+                "reason": "waste",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(outbound.status_code, 201, outbound.text)
+        listed_product = self.client.get(
+            "/inventory/products",
+            headers=self.headers,
+        ).json()[0]
+        listed_orders = self.client.get(
+            "/inventory/orders",
+            headers=self.headers,
+        ).json()
+        self.assertEqual(listed_product["current_stock"], 5)
+        self.assertEqual(
+            {(order["type"], order["id"]) for order in listed_orders},
+            {("inbound", 1), ("outbound", outbound.json()["id"])},
+        )
+
+    def test_expired_products_cache_reloads_external_database_changes(self):
+        clock = [0.0]
+        with patch.object(inventory_cache, "_clock", lambda: clock[0]):
+            first = self.client.get("/inventory/products", headers=self.headers)
+            self.assertEqual(first.json(), [])
+            with Session(self.engine) as session:
+                session.add(Ingredient(**PRODUCT))
+                session.commit()
+
+            before_expiration = self.client.get(
+                "/inventory/products",
+                headers=self.headers,
+            )
+            self.assertEqual(before_expiration.json(), [])
+            clock[0] += INVENTORY_CACHE_TTL_SECONDS + 0.1
+            after_expiration = self.client.get(
+                "/inventory/products",
+                headers=self.headers,
+            )
+            self.assertEqual(len(after_expiration.json()), 1)
+
+    def test_unauthenticated_read_is_rejected_when_cache_is_warm(self):
+        self.assertEqual(
+            self.client.get(
+                "/inventory/products",
+                headers=self.headers,
+            ).status_code,
+            200,
+        )
+        response = self.client.get("/inventory/products")
+        self.assertEqual(response.status_code, 401)
+
+    def test_outbound_validation_uses_database_not_stale_products_cache(self):
+        product = self.create_product()
+        self.client.post(
+            "/inventory/orders/inbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 5,
+                "supplier_name": "Proveedor",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        cached_products = self.client.get(
+            "/inventory/products",
+            headers=self.headers,
+        ).json()
+        self.assertEqual(cached_products[0]["current_stock"], 5)
+
+        with Session(self.engine) as session:
+            session.add(
+                IngredientExit(
+                    ingredient_id=product["id"],
+                    quantity=3,
+                    reason="waste",
+                    location_id=1,
+                    user_uuid=str(self.user_id),
+                )
+            )
+            session.commit()
+        self.assertEqual(
+            self.client.get(
+                "/inventory/products",
+                headers=self.headers,
+            ).json()[0]["current_stock"],
+            5,
+        )
+
+        response = self.client.post(
+            "/inventory/orders/outbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 3,
+                "reason": "waste",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 400, response.text)
+
     def test_queries_for_products_and_orders_do_not_grow_with_ingredients(self):
         self._seed_ingredients_and_movements(1)
+        inventory_cache.clear()
         product_queries_one = self._count_select_queries("/inventory/products")
         order_queries_one = self._count_select_queries("/inventory/orders")
 
         self._seed_ingredients_and_movements(3, start_index=1)
+        inventory_cache.clear()
         product_queries_many = self._count_select_queries("/inventory/products")
         order_queries_many = self._count_select_queries("/inventory/orders")
 
