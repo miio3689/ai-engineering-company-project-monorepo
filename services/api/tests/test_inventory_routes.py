@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import event
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlalchemy.pool import StaticPool
 
@@ -686,6 +687,30 @@ class InventoryRoutesTests(unittest.TestCase):
         self.assertEqual(orders_first, 2)
         self.assertEqual(products_second, 0)
         self.assertEqual(orders_second, 0)
+
+    def test_inventory_read_errors_return_503_and_are_not_cached(self):
+        original_exec = Session.exec
+
+        for path in ("/inventory/products", "/inventory/orders"):
+            with self.subTest(path=path):
+                inventory_cache.clear()
+                execution_count = 0
+
+                def fail_first_exec(session, *args, **kwargs):
+                    nonlocal execution_count
+                    execution_count += 1
+                    if execution_count == 1:
+                        raise SQLAlchemyError("temporary database failure")
+                    return original_exec(session, *args, **kwargs)
+
+                with patch.object(Session, "exec", new=fail_first_exec):
+                    failed = self.client.get(path, headers=self.headers)
+                    self.assertEqual(failed.status_code, 503, failed.text)
+                    self.assertEqual(execution_count, 1)
+
+                    recovered = self.client.get(path, headers=self.headers)
+                    self.assertEqual(recovered.status_code, 200, recovered.text)
+                    self.assertGreater(execution_count, 1)
 
     def test_product_create_invalidates_warm_products_cache(self):
         initial = self.client.get("/inventory/products", headers=self.headers)
