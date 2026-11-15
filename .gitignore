@@ -7,3 +7,9 @@ dist/
 __pycache__/
 *.pyc
 .env
+
+# Load test data (temporary files, never committed)
+services/api/.loadtest/
+*.db
+*_small.json
+*_large.json

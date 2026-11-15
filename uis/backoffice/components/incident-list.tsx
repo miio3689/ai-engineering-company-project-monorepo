@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { useIncidentList } from "@/hooks/use-incidents";
 import {
@@ -20,13 +20,15 @@ import {
   type IncidentStatus,
 } from "@/types/incident";
 
+const incidentDateFormatter = new Intl.DateTimeFormat("es-CO", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
 function displayDate(value: string): string {
   const date = new Date(value ?? "");
   if (Number.isNaN(date.getTime())) return "Fecha no disponible";
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return incidentDateFormatter.format(date);
 }
 
 function StatusAction({
@@ -114,6 +116,13 @@ export default function IncidentList() {
   };
   const { incidents, loading, error, retry, replaceIncident } = useIncidentList(filters);
   const hasFilters = Boolean(status || origin || branch);
+  const preparedIncidents = useMemo(
+    () => incidents.map((incident) => ({
+      incident,
+      formattedDate: displayDate(incident.created_at),
+    })),
+    [incidents],
+  );
 
   async function changeStatus(incident: Incident, nextStatus: IncidentStatus) {
     if (pendingRef.current.has(incident.id)) return;
@@ -244,7 +253,7 @@ export default function IncidentList() {
 
         {!loading && !error && incidents.length > 0 && (
           <ul className="grid min-w-0 gap-4">
-            {incidents.map((incident) => (
+            {preparedIncidents.map(({ incident, formattedDate }) => (
               <li key={incident.id} className="min-w-0">
                 <article className="grid min-w-0 gap-4 rounded-xl border border-gray-200 p-4 sm:p-5">
                   <header className="flex min-w-0 flex-wrap items-start justify-between gap-3">
@@ -272,7 +281,7 @@ export default function IncidentList() {
                     </div>
                     <div className="min-w-0">
                       <dt className="text-sm font-semibold text-gray-600">Fecha de registro</dt>
-                      <dd>{displayDate(incident.created_at)}</dd>
+                      <dd>{formattedDate}</dd>
                     </div>
                   </dl>
 
