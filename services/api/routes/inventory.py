@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 import logging
+from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
@@ -21,6 +22,9 @@ from ..inventory.schemas import (
     InventoryOrderRead,
     LocationStockRead,
     OutboundOrderRead,
+    PriceVarianceRead,
+    StockEditAttempt,
+    StockEditRejection,
 )
 from ..models import UserResponse
 
@@ -32,6 +36,12 @@ ORDERS_CACHE_KEY = "inventory.orders"
 # backstop for external seed scripts while avoiding repeated aggregate queries.
 INVENTORY_CACHE_TTL_SECONDS = 60
 inventory_cache = InProcessTTLCache()
+PRICE_VARIANCE_THRESHOLD_PCT = 10.0
+PRICE_BASELINE_ENTRIES = 5
+DIRECT_STOCK_EDIT_MESSAGE = (
+    "El stock no se modifica directamente: "
+    "registra una orden de entrada o de salida."
+)
 
 
 def _database_error(session: Session, exc: SQLAlchemyError) -> HTTPException:
@@ -234,6 +244,35 @@ def get_product(
     return _ingredient_response(ingredient, current_stock, stock_by_location)
 
 
+def _price_variance(session: Session, order: EntryCreate) -> PriceVarianceRead | None:
+    """Compare the new unit cost with the mean of the last entries of the same product and supplier."""
+    if order.unit_cost is None:
+        return None
+    previous_costs = session.exec(
+        select(IngredientEntry.unit_cost)
+        .where(
+            IngredientEntry.ingredient_id == order.ingredient_id,
+            IngredientEntry.supplier_name == order.supplier_name,
+            IngredientEntry.unit_cost.is_not(None),
+        )
+        .order_by(IngredientEntry.created_at.desc(), IngredientEntry.id.desc())
+        .limit(PRICE_BASELINE_ENTRIES)
+    ).all()
+    if not previous_costs:
+        return None
+    baseline = sum(previous_costs) / len(previous_costs)
+    if baseline <= 0:
+        return None
+    variance_pct = (order.unit_cost - baseline) / baseline * 100
+    if abs(variance_pct) <= PRICE_VARIANCE_THRESHOLD_PCT:
+        return None
+    return PriceVarianceRead(
+        baseline_unit_cost=round(baseline, 4),
+        variance_pct=round(variance_pct, 2),
+        threshold_pct=PRICE_VARIANCE_THRESHOLD_PCT,
+    )
+
+
 @router.post(
     "/orders/inbound",
     response_model=InboundOrderRead,
@@ -246,6 +285,7 @@ def create_inbound_order(
 ) -> InboundOrderRead:
     try:
         ingredient = _require_ingredient(session, order.ingredient_id)
+        price_variance = _price_variance(session, order)
         entry = IngredientEntry(
             **order.model_dump(),
             user_uuid=str(current_user.id),
@@ -270,6 +310,8 @@ def create_inbound_order(
         created_at=entry.created_at,
         user_uuid=entry.user_uuid,
         supplier_name=entry.supplier_name,
+        unit_cost=entry.unit_cost,
+        price_variance=price_variance,
     )
 
 
@@ -349,6 +391,40 @@ def create_outbound_order(
     )
 
 
+@router.put(
+    "/products/{ingredient_id}/stock",
+    response_model=StockEditRejection,
+    status_code=status.HTTP_403_FORBIDDEN,
+    responses={
+        403: {
+            "model": StockEditRejection,
+            "description": "El stock solo cambia mediante órdenes de entrada o de salida.",
+        }
+    },
+)
+def reject_direct_stock_edit(
+    ingredient_id: int,
+    attempt: StockEditAttempt,
+    session: Session = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_user),
+) -> NoReturn:
+    """Business rule: stock is never edited directly, only through orders."""
+    try:
+        _require_ingredient(session, ingredient_id)
+    except SQLAlchemyError as exc:
+        raise _database_error(session, exc) from exc
+    logger.warning(
+        "Direct stock edit rejected (ingredient_id=%s, location_id=%s, user_id=%s).",
+        ingredient_id,
+        attempt.location_id,
+        current_user.id,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=DIRECT_STOCK_EDIT_MESSAGE,
+    )
+
+
 @router.get("/orders", response_model=list[InventoryOrderRead])
 def list_orders(
     _current_user: UserResponse = Depends(get_current_user),
@@ -383,6 +459,7 @@ def list_orders(
                 created_at=entry.created_at,
                 user_uuid=entry.user_uuid,
                 supplier_name=entry.supplier_name,
+                unit_cost=entry.unit_cost,
             )
             for entry, name, sku in entries
         ]

@@ -18,6 +18,7 @@ interface FormValues {
   ingredientId: string;
   quantity: string;
   supplierName: string;
+  unitCost: string;
   locationId: string;
 }
 
@@ -28,6 +29,7 @@ const INITIAL_VALUES: FormValues = {
   ingredientId: "",
   quantity: "",
   supplierName: "",
+  unitCost: "",
   locationId: "",
 };
 
@@ -70,7 +72,7 @@ export default function InventoryInboundForm() {
   ) {
     const updatedValues = { ...values, [field]: value };
     abandonment.fieldEdited(
-      [updatedValues.ingredientId, updatedValues.quantity, updatedValues.supplierName, updatedValues.locationId]
+      [updatedValues.ingredientId, updatedValues.quantity, updatedValues.supplierName, updatedValues.unitCost, updatedValues.locationId]
         .filter((fieldValue) => fieldValue.trim() !== "").length,
     );
     setValues((current) => ({ ...current, [field]: value }));
@@ -96,6 +98,11 @@ export default function InventoryInboundForm() {
 
     if (!values.supplierName.trim()) {
       errors.supplierName = "Introduce el nombre del proveedor.";
+    }
+
+    const unitCost = Number(values.unitCost);
+    if (!values.unitCost.trim() || !Number.isFinite(unitCost) || unitCost <= 0) {
+      errors.unitCost = "Introduce un costo unitario mayor que cero.";
     }
 
     const locationId = Number(values.locationId);
@@ -136,6 +143,7 @@ export default function InventoryInboundForm() {
         ingredient_id: ingredient.id,
         quantity: Number(values.quantity),
         supplier_name: values.supplierName.trim(),
+        unit_cost: Number(values.unitCost),
         location_id: Number(values.locationId),
       };
 
@@ -152,7 +160,10 @@ export default function InventoryInboundForm() {
         setValues(INITIAL_VALUES);
         setFieldErrors({});
         setSuccess(
-          `Entrada registrada: ${quantityFormatter.format(input.quantity)} ${unit} de ${ingredient.name} (Local ${input.location_id}, proveedor ${input.supplier_name}).`,
+          `Entrada registrada: ${quantityFormatter.format(input.quantity)} ${unit} de ${ingredient.name} (Local ${input.location_id}, proveedor ${input.supplier_name}).`
+          + (order.type === "inbound" && order.price_variance
+            ? ` Atención: el costo unitario varía un ${quantityFormatter.format(order.price_variance.variance_pct)} % respecto al histórico de este producto y proveedor (referencia: ${quantityFormatter.format(order.price_variance.baseline_unit_cost)}).`
+            : ""),
         );
       } catch (caught) {
         setError(caught instanceof InventoryServiceError || caught instanceof Error
@@ -291,6 +302,28 @@ export default function InventoryInboundForm() {
             {fieldErrors.supplierName && (
               <span id="supplierName-error" className="font-normal text-red-800">
                 {fieldErrors.supplierName}
+              </span>
+            )}
+          </label>
+
+          <label className="grid gap-2 font-semibold" htmlFor="unitCost">
+            Costo unitario{selectedIngredient ? ` (${selectedIngredient.country === "CO" ? "COP" : "USD"})` : ""} *
+            <input
+              id="unitCost"
+              name="unitCost"
+              type="number"
+              step="any"
+              inputMode="decimal"
+              value={values.unitCost}
+              onChange={(event) => updateField("unitCost", event.target.value)}
+              className={fieldClass}
+              required
+              aria-invalid={Boolean(fieldErrors.unitCost)}
+              aria-describedby={fieldDescription("unitCost")}
+            />
+            {fieldErrors.unitCost && (
+              <span id="unitCost-error" className="font-normal text-red-800">
+                {fieldErrors.unitCost}
               </span>
             )}
           </label>

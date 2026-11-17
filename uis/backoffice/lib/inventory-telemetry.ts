@@ -39,7 +39,21 @@ export function trackInboundCreated(
     ...eventBase(ingredient, input.location_id, input.quantity),
     inbound_order_id: order.id,
     supplier_name: input.supplier_name,
+    unit_cost: input.unit_cost,
   });
+
+  const variance = order.type === "inbound" ? order.price_variance : null;
+  if (variance) {
+    track("ingredient_price_variance_detected", {
+      ...eventBase(ingredient, input.location_id, input.quantity),
+      inbound_order_id: order.id,
+      supplier_name: input.supplier_name,
+      unit_cost: input.unit_cost,
+      baseline_unit_cost: variance.baseline_unit_cost,
+      variance_pct: variance.variance_pct,
+      threshold_pct: variance.threshold_pct,
+    });
+  }
 }
 
 /**
@@ -97,10 +111,24 @@ export function trackOutboundRejected(
   });
 }
 
+/** Intento de fijar el stock a mano: la API lo rechaza siempre (403). */
+export function trackDirectStockEditRejected(
+  ingredient: Ingredient,
+  locationId: number,
+  quantity: number,
+): void {
+  track("direct_stock_edit_rejected", {
+    ...eventBase(ingredient, locationId, quantity),
+    attempted_operation: "set_stock",
+    rejection_reason: "direct_edit_not_allowed",
+  });
+}
+
 const FIELD_NAMES: Record<string, string> = {
   ingredientId: "ingredient_id",
   quantity: "quantity",
   supplierName: "supplier_name",
+  unitCost: "unit_cost",
   locationId: "location_id",
   reason: "reason",
   wasteReason: "waste_reason",

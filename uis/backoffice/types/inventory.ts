@@ -36,9 +36,17 @@ interface InventoryOrderBase {
   user_uuid: string;
 }
 
+export interface PriceVariance {
+  baseline_unit_cost: number;
+  variance_pct: number;
+  threshold_pct: number;
+}
+
 export interface InboundOrder extends InventoryOrderBase {
   type: "inbound";
   supplier_name: string;
+  unit_cost?: number | null;
+  price_variance?: PriceVariance | null;
 }
 
 export interface OutboundOrder extends InventoryOrderBase {
@@ -52,7 +60,13 @@ export interface InboundOrderInput {
   ingredient_id: number;
   quantity: number;
   supplier_name: string;
+  unit_cost: number;
   location_id: number;
+}
+
+export interface DirectStockEditInput {
+  location_id: number;
+  quantity: number;
 }
 
 export interface OutboundOrderInput {
