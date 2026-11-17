@@ -33,6 +33,10 @@ class IngredientEntry(SQLModel, table=True):
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_ingredient_entry_quantity"),
         CheckConstraint(
+            "unit_cost IS NULL OR unit_cost > 0",
+            name="ck_ingredient_entry_unit_cost",
+        ),
+        CheckConstraint(
             "location_id BETWEEN 1 AND 14",
             name="ck_ingredient_entry_location",
         ),
@@ -42,6 +46,7 @@ class IngredientEntry(SQLModel, table=True):
     ingredient_id: int = Field(foreign_key="ingredient.id", index=True)
     quantity: float
     supplier_name: str
+    unit_cost: float | None = None
     location_id: int
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)

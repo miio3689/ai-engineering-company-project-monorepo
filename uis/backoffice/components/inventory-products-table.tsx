@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import StockAdjustmentAttempt from "@/components/stock-adjustment-attempt";
 import {
   getLocationStock,
   getStockLevel,
@@ -163,6 +164,7 @@ export default function InventoryProductsTable({
                         Registrar salida
                       </Link>
                     </div>
+                    <StockAdjustmentAttempt ingredient={ingredient} defaultLocationId={locationId} />
                   </td>
                 </tr>
               );

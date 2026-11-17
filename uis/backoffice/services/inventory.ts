@@ -14,6 +14,8 @@ import type {
   InventoryOrder,
   LocationStock,
   OutboundOrderInput,
+  DirectStockEditInput,
+  PriceVariance,
 } from "@/types/inventory";
 
 const INGREDIENT_UNITS: readonly IngredientUnit[] = ["kg", "litro", "unidad"];
@@ -69,6 +71,16 @@ function isIngredientList(value: unknown): value is Ingredient[] {
   return Array.isArray(value) && value.every(isIngredient);
 }
 
+function isPriceVariance(value: unknown): value is PriceVariance {
+  return isRecord(value)
+    && typeof value.baseline_unit_cost === "number"
+    && Number.isFinite(value.baseline_unit_cost)
+    && typeof value.variance_pct === "number"
+    && Number.isFinite(value.variance_pct)
+    && typeof value.threshold_pct === "number"
+    && Number.isFinite(value.threshold_pct);
+}
+
 function isInventoryOrder(value: unknown): value is InventoryOrder {
   if (!isRecord(value)
     || typeof value.id !== "number"
@@ -87,7 +99,13 @@ function isInventoryOrder(value: unknown): value is InventoryOrder {
     return false;
   }
 
-  if (value.type === "inbound") return typeof value.supplier_name === "string";
+  if (value.type === "inbound") {
+    return typeof value.supplier_name === "string"
+      && (value.unit_cost === undefined || value.unit_cost === null
+        || (typeof value.unit_cost === "number" && Number.isFinite(value.unit_cost)))
+      && (value.price_variance === undefined || value.price_variance === null
+        || isPriceVariance(value.price_variance));
+  }
   return value.type === "outbound"
     && typeof value.reason === "string"
     && EXIT_REASONS.includes(value.reason as ExitReason);
@@ -185,4 +203,18 @@ export function createOutboundOrder(input: OutboundOrderInput): Promise<Inventor
 
 export function fetchOrders(signal?: AbortSignal): Promise<InventoryOrder[]> {
   return requestJson("/inventory/orders", isInventoryOrderList, { signal });
+}
+
+/** La API rechaza siempre este intento (403): el stock solo cambia con órdenes. */
+export async function attemptDirectStockEdit(
+  ingredientId: number,
+  input: DirectStockEditInput,
+): Promise<never> {
+  const response = await apiRequest(`/inventory/products/${ingredientId}/stock`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (response.ok) throw new Error(INVALID_API_RESPONSE_MESSAGE);
+  return throwHttpError(response);
 }

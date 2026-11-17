@@ -107,6 +107,8 @@ class InventoryModelTests(unittest.TestCase):
         invalid_entries = [
             {"quantity": 0},
             {"quantity": -1},
+            {"unit_cost": 0},
+            {"unit_cost": -1},
             {"location_id": 0},
             {"location_id": 15},
         ]
@@ -117,6 +119,7 @@ class InventoryModelTests(unittest.TestCase):
                         ingredient_id=ingredient.id,
                         quantity=changes.get("quantity", 1),
                         supplier_name="Proveedor",
+                        unit_cost=changes.get("unit_cost"),
                         location_id=changes.get("location_id", 1),
                         user_uuid="1",
                     )

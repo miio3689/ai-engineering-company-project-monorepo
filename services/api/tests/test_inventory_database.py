@@ -1,14 +1,18 @@
 """Tests for optional inventory database setup and request sessions."""
 
 import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import inspect
 from sqlmodel import Session, create_engine, select
 
 from services.api.app import main
+from services.api.inventory import database
 from services.api.inventory.database import get_db
 
 
@@ -57,6 +61,31 @@ class InventoryDatabaseTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json(), {"value": 1})
+
+    def test_init_inventory_db_adds_unit_cost_column_idempotently(self):
+        with TemporaryDirectory() as temporary:
+            database_path = Path(temporary) / "inventory.sqlite"
+            engine = create_engine(f"sqlite:///{database_path}")
+            with engine.begin() as connection:
+                connection.exec_driver_sql(
+                    "CREATE TABLE ingredient_entry (id INTEGER PRIMARY KEY)"
+                )
+            engine.dispose()
+
+            with (
+                patch.dict(os.environ, {"DATABASE_URL": f"sqlite:///{database_path}"}),
+                patch.object(database, "_engine", None),
+            ):
+                database.init_inventory_db()
+                database.init_inventory_db()
+                migrated_engine = database.get_engine()
+                columns = {
+                    column["name"]
+                    for column in inspect(migrated_engine).get_columns("ingredient_entry")
+                }
+                migrated_engine.dispose()
+
+            self.assertIn("unit_cost", columns)
 
 
 if __name__ == "__main__":

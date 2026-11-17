@@ -110,7 +110,7 @@ class InventoryRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         return response.json()
 
-    def test_all_six_inventory_endpoints_require_authentication(self):
+    def test_all_seven_inventory_endpoints_require_authentication(self):
         requests = (
             ("GET", "/inventory/products", None),
             ("POST", "/inventory/products", PRODUCT),
@@ -136,6 +136,11 @@ class InventoryRoutesTests(unittest.TestCase):
                 },
             ),
             ("GET", "/inventory/orders", None),
+            (
+                "PUT",
+                "/inventory/products/1/stock",
+                {"location_id": 1, "quantity": 5},
+            ),
         )
         for method, url, payload in requests:
             with self.subTest(method=method, url=url):
@@ -671,6 +676,11 @@ class InventoryRoutesTests(unittest.TestCase):
                     "created_at",
                     "user_uuid",
                     "reason" if order["type"] == "outbound" else "supplier_name",
+                    *(
+                        ("unit_cost", "price_variance")
+                        if order["type"] == "inbound"
+                        else ()
+                    ),
                 },
             )
             self.assertEqual(order["name"], PRODUCT["name"])
@@ -895,6 +905,234 @@ class InventoryRoutesTests(unittest.TestCase):
         self.assertEqual(
             response.json(),
             {"detail": "Servicio de inventario no disponible."},
+        )
+
+    def test_inbound_unit_cost_is_optional_persisted_and_returned_in_order_list(self):
+        product = self.create_product()
+        with_cost = self.client.post(
+            "/inventory/orders/inbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 4,
+                "supplier_name": "Proveedor con costo",
+                "unit_cost": 12.5,
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(with_cost.status_code, 201, with_cost.text)
+        self.assertEqual(with_cost.json()["unit_cost"], 12.5)
+        self.assertIsNone(with_cost.json()["price_variance"])
+        with Session(self.engine) as session:
+            stored = session.exec(select(IngredientEntry)).one()
+            self.assertEqual(stored.unit_cost, 12.5)
+
+        without_cost = self.client.post(
+            "/inventory/orders/inbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 2,
+                "supplier_name": "Proveedor sin costo",
+                "location_id": 2,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(without_cost.status_code, 201, without_cost.text)
+        self.assertIsNone(without_cost.json()["unit_cost"])
+        self.assertIsNone(without_cost.json()["price_variance"])
+
+        invalid_costs = (0, -1, float("nan"))
+        for cost in invalid_costs:
+            with self.subTest(unit_cost=cost):
+                payload = {
+                    "ingredient_id": product["id"],
+                    "quantity": 1,
+                    "supplier_name": "Proveedor inválido",
+                    "unit_cost": "NaN" if isinstance(cost, float) and cost != cost else cost,
+                    "location_id": 1,
+                }
+                response = self.client.post(
+                    "/inventory/orders/inbound",
+                    json=payload,
+                    headers=self.headers,
+                )
+                self.assertEqual(response.status_code, 422, response.text)
+
+        orders = self.client.get("/inventory/orders", headers=self.headers)
+        self.assertEqual(orders.status_code, 200, orders.text)
+        inbound_by_supplier = {
+            order["supplier_name"]: order
+            for order in orders.json()
+            if order["type"] == "inbound"
+        }
+        self.assertEqual(inbound_by_supplier["Proveedor con costo"]["unit_cost"], 12.5)
+        self.assertIsNone(inbound_by_supplier["Proveedor sin costo"]["unit_cost"])
+
+    def test_price_variance_uses_five_recent_costs_for_same_ingredient_and_supplier(self):
+        def add_history(product_id, supplier, cost, day):
+            from datetime import datetime, timedelta, timezone
+
+            with Session(self.engine) as session:
+                session.add(
+                    IngredientEntry(
+                        ingredient_id=product_id,
+                        quantity=1,
+                        supplier_name=supplier,
+                        unit_cost=cost,
+                        location_id=1,
+                        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc)
+                        + timedelta(days=day),
+                        user_uuid=str(self.user_id),
+                    )
+                )
+                session.commit()
+
+        def inbound(product_id, supplier, cost):
+            return self.client.post(
+                "/inventory/orders/inbound",
+                json={
+                    "ingredient_id": product_id,
+                    "quantity": 1,
+                    "supplier_name": supplier,
+                    "unit_cost": cost,
+                    "location_id": 1,
+                },
+                headers=self.headers,
+            )
+
+        product = self.create_product()
+        for day in range(3):
+            add_history(product["id"], "Proveedor A", 100, day)
+        increase = inbound(product["id"], "Proveedor A", 130)
+        self.assertEqual(increase.status_code, 201, increase.text)
+        self.assertEqual(
+            increase.json()["price_variance"],
+            {
+                "baseline_unit_cost": 100.0,
+                "variance_pct": 30.0,
+                "threshold_pct": 10.0,
+            },
+        )
+
+        in_range_product = self.create_product(
+            PRODUCT | {"sku": "BRS-TEST-IN-RANGE"},
+        )
+        for day in range(3):
+            add_history(in_range_product["id"], "Proveedor B", 100, day)
+        in_range = inbound(in_range_product["id"], "Proveedor B", 105)
+        self.assertEqual(in_range.status_code, 201, in_range.text)
+        self.assertIsNone(in_range.json()["price_variance"])
+
+        no_history_product = self.create_product(
+            PRODUCT | {"sku": "BRS-TEST-NO-HISTORY"},
+        )
+        first = inbound(no_history_product["id"], "Proveedor C", 100)
+        self.assertEqual(first.status_code, 201, first.text)
+        self.assertIsNone(first.json()["price_variance"])
+        other_supplier = inbound(no_history_product["id"], "Proveedor D", 130)
+        self.assertEqual(other_supplier.status_code, 201, other_supplier.text)
+        self.assertIsNone(other_supplier.json()["price_variance"])
+
+        recent_product = self.create_product(
+            PRODUCT | {"sku": "BRS-TEST-RECENT"},
+        )
+        add_history(recent_product["id"], "Proveedor E", 1000, 0)
+        for day in range(1, 6):
+            add_history(recent_product["id"], "Proveedor E", 100, day)
+        recent = inbound(recent_product["id"], "Proveedor E", 100)
+        self.assertEqual(recent.status_code, 201, recent.text)
+        self.assertIsNone(recent.json()["price_variance"])
+
+        decrease_product = self.create_product(
+            PRODUCT | {"sku": "BRS-TEST-DECREASE"},
+        )
+        for day in range(3):
+            add_history(decrease_product["id"], "Proveedor F", 100, day)
+        decrease = inbound(decrease_product["id"], "Proveedor F", 80)
+        self.assertEqual(decrease.status_code, 201, decrease.text)
+        self.assertEqual(decrease.json()["price_variance"]["variance_pct"], -20.0)
+
+        no_cost_product = self.create_product(
+            PRODUCT | {"sku": "BRS-TEST-NULL-COST"},
+        )
+        add_history(no_cost_product["id"], "Proveedor G", None, 0)
+        ignored_null = inbound(no_cost_product["id"], "Proveedor G", 130)
+        self.assertEqual(ignored_null.status_code, 201, ignored_null.text)
+        self.assertIsNone(ignored_null.json()["price_variance"])
+
+    def test_direct_stock_edit_is_rejected_without_changing_stock(self):
+        product = self.create_product()
+        inbound = self.client.post(
+            "/inventory/orders/inbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 10,
+                "supplier_name": "Proveedor",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(inbound.status_code, 201, inbound.text)
+        before = self.client.get(
+            "/inventory/products",
+            headers=self.headers,
+        ).json()[0]["current_stock"]
+
+        rejected = self.client.put(
+            f"/inventory/products/{product['id']}/stock",
+            json={"location_id": 1, "quantity": 50},
+            headers=self.headers,
+        )
+        self.assertEqual(rejected.status_code, 403, rejected.text)
+        self.assertEqual(
+            rejected.json(),
+            {
+                "detail": (
+                    "El stock no se modifica directamente: "
+                    "registra una orden de entrada o de salida."
+                )
+            },
+        )
+        after = self.client.get(
+            "/inventory/products",
+            headers=self.headers,
+        ).json()[0]["current_stock"]
+        self.assertEqual(after, before)
+
+        unauthenticated = self.client.put(
+            f"/inventory/products/{product['id']}/stock",
+            json={"location_id": 1, "quantity": 50},
+        )
+        missing = self.client.put(
+            "/inventory/products/999999/stock",
+            json={"location_id": 1, "quantity": 50},
+            headers=self.headers,
+        )
+        self.assertEqual(unauthenticated.status_code, 401, unauthenticated.text)
+        self.assertEqual(missing.status_code, 404, missing.text)
+
+        invalid_payloads = (
+            {"location_id": 0, "quantity": 1},
+            {"location_id": 15, "quantity": 1},
+            {"location_id": 1, "quantity": -1},
+            {"location_id": 1, "quantity": 1, "extra": True},
+        )
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload):
+                invalid = self.client.put(
+                    f"/inventory/products/{product['id']}/stock",
+                    json=payload,
+                    headers=self.headers,
+                )
+                self.assertEqual(invalid.status_code, 422, invalid.text)
+
+    def test_direct_stock_edit_route_documents_403_in_openapi(self):
+        openapi = self.client.get("/openapi.json").json()
+        operation = openapi["paths"]["/inventory/products/{ingredient_id}/stock"]["put"]
+        self.assertIn("403", operation["responses"])
+        self.assertEqual(
+            operation["responses"]["403"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/StockEditRejection",
         )
 
     def _seed_ingredients_and_movements(self, count, start_index=0):

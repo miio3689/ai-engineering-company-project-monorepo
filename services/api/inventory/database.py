@@ -5,6 +5,7 @@ import os
 from collections.abc import Iterator
 
 from fastapi import HTTPException
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -53,6 +54,20 @@ def get_db() -> Iterator[Session]:
         ) from exc
 
 
+def _ensure_entry_unit_cost_column(engine) -> None:
+    """Add ingredient_entry.unit_cost to tables created before that column existed."""
+    inspector = inspect(engine)
+    if "ingredient_entry" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("ingredient_entry")}
+    if "unit_cost" in columns:
+        return
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE ingredient_entry ADD COLUMN unit_cost DOUBLE PRECISION")
+        )
+
+
 def init_inventory_db() -> None:
     """Create registered inventory tables when a database URL is configured."""
     database_url = os.environ.get("DATABASE_URL")
@@ -60,7 +75,9 @@ def init_inventory_db() -> None:
         return
 
     try:
-        SQLModel.metadata.create_all(get_engine())
+        engine = get_engine()
+        SQLModel.metadata.create_all(engine)
+        _ensure_entry_unit_cost_column(engine)
     except Exception as exc:
         logger.error(
             "Inventory database initialization failed (type: %s).",

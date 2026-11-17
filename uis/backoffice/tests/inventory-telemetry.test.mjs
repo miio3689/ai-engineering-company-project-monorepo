@@ -54,6 +54,7 @@ const inboundInput = (overrides = {}) => ({
   ingredient_id: 42,
   quantity: 6,
   supplier_name: "Proveedor de prueba",
+  unit_cost: 130,
   location_id: 3,
   ...overrides,
 });
@@ -76,7 +77,9 @@ const inventoryOrder = (type, overrides = {}) => ({
   location_id: 3,
   created_at: "2026-01-01T00:00:00Z",
   user_uuid: "7",
-  ...(type === "inbound" ? { supplier_name: "Proveedor de prueba" } : { reason: "consumption" }),
+  ...(type === "inbound"
+    ? { supplier_name: "Proveedor de prueba", unit_cost: 130 }
+    : { reason: "consumption" }),
   ...overrides,
 });
 
@@ -268,6 +271,75 @@ test("la entrada incluye su id, proveedor y país/moneda coherentes", async () =
   assert.equal(usEvent.properties.currency, "USD");
 });
 
+test("la entrada captura unit_cost y emite variación de precio solo cuando existe", async () => {
+  for (const [country, currency] of [["CO", "COP"], ["US", "USD"]]) {
+    inventoryTelemetry.trackInboundCreated(
+      ingredient({ country }),
+      inboundInput({ unit_cost: 130 }),
+      inventoryOrder("inbound", {
+        unit_cost: 130,
+        price_variance: {
+          baseline_unit_cost: 100,
+          variance_pct: 30,
+          threshold_pct: 10,
+        },
+      }),
+    );
+    const events = await takeEvents();
+    assert.deepEqual(
+      events.map((event) => event.event_type),
+      ["inbound_order_created", "ingredient_price_variance_detected"],
+    );
+    assert.equal(events[0].properties.unit_cost, 130);
+    const variance = events[1].properties;
+    assert.deepEqual(
+      variance,
+      {
+        location_id: 3,
+        country,
+        product_id: 42,
+        product_category: "produce",
+        quantity: 6,
+        unit: "kg",
+        currency,
+        inbound_order_id: 99,
+        supplier_name: "Proveedor de prueba",
+        unit_cost: 130,
+        baseline_unit_cost: 100,
+        variance_pct: 30,
+        threshold_pct: 10,
+      },
+    );
+  }
+
+  for (const priceVariance of [null, undefined]) {
+    inventoryTelemetry.trackInboundCreated(
+      ingredient(),
+      inboundInput(),
+      inventoryOrder("inbound", { price_variance: priceVariance }),
+    );
+    const events = await takeEvents();
+    assert.deepEqual(events.map((event) => event.event_type), ["inbound_order_created"]);
+  }
+});
+
+test("trackDirectStockEditRejected envía solo las propiedades permitidas", async () => {
+  inventoryTelemetry.trackDirectStockEditRejected(ingredient(), 9, 23);
+  const [event] = await takeEvents();
+  assert.equal(event.event_type, "direct_stock_edit_rejected");
+  assert.deepEqual(event.properties, {
+    location_id: 9,
+    country: "CO",
+    product_id: 42,
+    product_category: "produce",
+    quantity: 23,
+    unit: "kg",
+    currency: "COP",
+    attempted_operation: "set_stock",
+    rejection_reason: "direct_edit_not_allowed",
+  });
+});
+
 test("la validación se limita por formulario/campo y no transmite el valor", async () => {
   inventoryTelemetry.trackInventoryValidationFailed("inbound_order", {
     quantity: "Introduce una cantidad mayor que cero: valor_privado",
@@ -285,4 +357,14 @@ test("la validación se limita por formulario/campo y no transmite el valor", as
     ["quantity", "supplier_name"],
   );
   assert.ok(events.every((event) => !JSON.stringify(event).includes("valor_privado")));
+});
+
+test("la validación del costo unitario se clasifica como fuera de rango", async () => {
+  inventoryTelemetry.trackInventoryValidationFailed("inbound_order", {
+    unitCost: "Introduce un costo unitario mayor que cero.",
+  });
+  const [event] = await takeEvents();
+  assert.equal(event.event_type, "inventory_form_validation_failed");
+  assert.equal(event.properties.field_name, "unit_cost");
+  assert.equal(event.properties.error_code, "out_of_range");
 });
