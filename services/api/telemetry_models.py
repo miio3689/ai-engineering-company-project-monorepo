@@ -28,15 +28,9 @@ class TelemetryEvent(BaseModel):
     properties: dict[str, Any]
 
 
-class TelemetryBatch(BaseModel):
-    """Batch of events sent by the frontend in one request."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    events: list[TelemetryEvent] = Field(min_length=1, max_length=100)
-
-
 class TelemetryReceipt(BaseModel):
-    """Response of the receiver: how many events were accepted."""
+    """Response of the receiver for one batch: received = stored + rejected."""
 
     received: int
+    stored: int
+    rejected: int

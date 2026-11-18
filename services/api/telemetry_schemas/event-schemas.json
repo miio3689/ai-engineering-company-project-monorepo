@@ -1,0 +1,505 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://brasaland.example/telemetry/event-schemas.json",
+  "title": "Brasaland telemetry event schemas",
+  "description": "Esquemas JSON Schema draft-07 de los 21 eventos del plan de telemetría. Cada evento valida contra events.<event_type>.schema.",
+  "schemaVersion": "1.0.0",
+  "definitions": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eventId", "timestamp", "sessionId", "userId", "event_type", "schemaVersion", "requestId", "properties"],
+      "properties": {
+        "eventId": { "$ref": "#/definitions/uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "sessionId": { "$ref": "#/definitions/uuid" },
+        "userId": {
+          "type": "string",
+          "pattern": "^(anonymous|[0-9]+)$"
+        },
+        "event_type": { "type": "string", "pattern": "^[a-z]+(_[a-z]+)+$" },
+        "schemaVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "requestId": {
+          "type": "string",
+          "pattern": "^(none|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+        },
+        "properties": { "type": "object" }
+      }
+    },
+    "location_id": { "type": "integer", "minimum": 1, "maximum": 14 },
+    "country": { "type": "string", "enum": ["CO", "US"] },
+    "currency": { "type": "string", "enum": ["COP", "USD"] },
+    "product_id": { "type": "integer", "minimum": 1 },
+    "product_category": { "type": "string", "enum": ["meat", "produce", "sauce", "beverage", "packaging", "cleaning"] },
+    "quantity": { "type": "number", "minimum": 0 },
+    "unit": { "type": "string", "enum": ["kg", "litro", "unidad"] },
+    "supplier_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "route_template": { "type": "string", "pattern": "^/", "maxLength": 120 },
+    "http_method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+    "positive_number": { "type": "number", "exclusiveMinimum": 0 },
+    "non_negative_number": { "type": "number", "minimum": 0 },
+    "positive_integer": { "type": "integer", "minimum": 1 }
+  },
+  "pii": {
+    "envelope.userId": "Identificador interno pseudónimo (dato personal indirecto); solo en el envelope; 'anonymous' antes del login.",
+    "never_captured": ["email", "nombre", "contraseña", "token", "texto libre", "URL completa", "query string", "dirección IP"]
+  },
+  "events": {
+    "inbound_order_created": {
+      "description": "Un local registra la llegada de mercancía de un proveedor.",
+      "category": "negocio", "group": "obligatorio", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "inbound_order_created" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "inbound_order_id", "supplier_name"],
+            "properties": {
+              "location_id": { "$ref": "#/definitions/location_id" },
+              "country": { "$ref": "#/definitions/country" },
+              "product_id": { "$ref": "#/definitions/product_id" },
+              "product_category": { "$ref": "#/definitions/product_category" },
+              "quantity": { "$ref": "#/definitions/quantity" },
+              "unit": { "$ref": "#/definitions/unit" },
+              "currency": { "$ref": "#/definitions/currency" },
+              "inbound_order_id": { "$ref": "#/definitions/positive_integer" },
+              "supplier_name": { "$ref": "#/definitions/supplier_name" },
+              "unit_cost": { "$ref": "#/definitions/positive_number" }
+            }
+          }
+        }
+      }
+    },
+    "outbound_order_created": {
+      "description": "Un local registra consumo de ingredientes en la preparación de un plato (salida con reason = consumption).",
+      "category": "negocio", "group": "obligatorio", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "outbound_order_created" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "outbound_order_id"],
+            "properties": {
+              "location_id": { "$ref": "#/definitions/location_id" },
+              "country": { "$ref": "#/definitions/country" },
+              "product_id": { "$ref": "#/definitions/product_id" },
+              "product_category": { "$ref": "#/definitions/product_category" },
+              "quantity": { "$ref": "#/definitions/quantity" },
+              "unit": { "$ref": "#/definitions/unit" },
+              "currency": { "$ref": "#/definitions/currency" },
+              "outbound_order_id": { "$ref": "#/definitions/positive_integer" }
+            }
+          }
+        }
+      }
+    },
+    "stock_waste_registered": {
+      "description": "Un local registra merma (salida con reason = waste). Es excluyente con outbound_order_created para la misma orden.",
+      "category": "negocio", "group": "obligatorio", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "stock_waste_registered" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "outbound_order_id", "reason"],
+            "properties": {
+              "location_id": { "$ref": "#/definitions/location_id" },
+              "country": { "$ref": "#/definitions/country" },
+              "product_id": { "$ref": "#/definitions/product_id" },
+              "product_category": { "$ref": "#/definitions/product_category" },
+              "quantity": { "$ref": "#/definitions/quantity" },
+              "unit": { "$ref": "#/definitions/unit" },
+              "currency": { "$ref": "#/definitions/currency" },
+              "outbound_order_id": { "$ref": "#/definitions/positive_integer" },
+              "reason": { "type": "string", "enum": ["expired", "kitchen_error", "theft_suspected"] }
+            }
+          }
+        }
+      }
+    },
+    "stock_threshold_triggered": {
+      "description": "El stock de un producto cae por debajo del mínimo de ese local. Se emite solo al cruzar el umbral hacia abajo.",
+      "category": "negocio", "group": "obligatorio", "delivery": "stream", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "stock_threshold_triggered" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "threshold_quantity", "triggering_outbound_order_id"],
+            "properties": {
+              "location_id": { "$ref": "#/definitions/location_id" },
+              "country": { "$ref": "#/definitions/country" },
+              "product_id": { "$ref": "#/definitions/product_id" },
+              "product_category": { "$ref": "#/definitions/product_category" },
+              "quantity": { "$ref": "#/definitions/quantity" },
+              "unit": { "$ref": "#/definitions/unit" },
+              "currency": { "$ref": "#/definitions/currency" },
+              "threshold_quantity": { "$ref": "#/definitions/non_negative_number" },
+              "triggering_outbound_order_id": { "$ref": "#/definitions/positive_integer" }
+            }
+          }
+        }
+      }
+    },
+    "direct_stock_edit_rejected": {
+      "description": "Un usuario intenta modificar el stock fuera de una orden y el sistema lo rechaza.",
+      "category": "negocio", "group": "obligatorio", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "direct_stock_edit_rejected" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "attempted_operation", "rejection_reason"],
+            "properties": {
+              "location_id": { "$ref": "#/definitions/location_id" },
+              "country": { "$ref": "#/definitions/country" },
+              "product_id": { "$ref": "#/definitions/product_id" },
+              "product_category": { "$ref": "#/definitions/product_category" },
+              "quantity": { "$ref": "#/definitions/quantity" },
+              "unit": { "$ref": "#/definitions/unit" },
+              "currency": { "$ref": "#/definitions/currency" },
+              "attempted_operation": { "type": "string", "enum": ["set_stock", "adjust_stock", "other"] },
+              "rejection_reason": { "type": "string", "enum": ["direct_edit_not_allowed", "forbidden_role"] }
+            }
+          }
+        }
+      }
+    },
+    "ingredient_price_variance_detected": {
+      "description": "El costo unitario de una entrada varía más del umbral respecto a la media de las últimas 5 entradas del mismo producto y proveedor.",
+      "category": "negocio", "group": "obligatorio", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "ingredient_price_variance_detected" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "inbound_order_id", "supplier_name", "unit_cost", "baseline_unit_cost", "variance_pct", "threshold_pct"],
+            "properties": {
+              "location_id": { "$ref": "#/definitions/location_id" },
+              "country": { "$ref": "#/definitions/country" },
+              "product_id": { "$ref": "#/definitions/product_id" },
+              "product_category": { "$ref": "#/definitions/product_category" },
+              "quantity": { "$ref": "#/definitions/quantity" },
+              "unit": { "$ref": "#/definitions/unit" },
+              "currency": { "$ref": "#/definitions/currency" },
+              "inbound_order_id": { "$ref": "#/definitions/positive_integer" },
+              "supplier_name": { "$ref": "#/definitions/supplier_name" },
+              "unit_cost": { "$ref": "#/definitions/positive_number" },
+              "baseline_unit_cost": { "$ref": "#/definitions/positive_number" },
+              "variance_pct": { "type": "number" },
+              "threshold_pct": { "$ref": "#/definitions/positive_number" }
+            }
+          }
+        }
+      }
+    },
+    "outbound_order_rejected": {
+      "description": "Una orden de salida es rechazada (stock insuficiente, ingrediente inexistente, validación o error de base de datos).",
+      "category": "negocio", "group": "oportunidad", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "outbound_order_rejected" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["location_id", "country", "currency", "product_id", "quantity", "rejection_reason"],
+            "properties": {
+              "location_id": { "$ref": "#/definitions/location_id" },
+              "country": { "$ref": "#/definitions/country" },
+              "currency": { "$ref": "#/definitions/currency" },
+              "product_id": { "$ref": "#/definitions/product_id" },
+              "product_category": { "$ref": "#/definitions/product_category" },
+              "quantity": { "$ref": "#/definitions/quantity" },
+              "unit": { "$ref": "#/definitions/unit" },
+              "available_quantity": { "$ref": "#/definitions/non_negative_number" },
+              "rejection_reason": { "type": "string", "enum": ["insufficient_stock", "ingredient_not_found", "validation_error", "database_error"] }
+            }
+          }
+        }
+      }
+    },
+    "product_created": {
+      "description": "Se da de alta un producto en el catálogo de inventario.",
+      "category": "negocio", "group": "oportunidad", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "product_created" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["product_id", "product_category", "unit", "country"],
+            "properties": {
+              "product_id": { "$ref": "#/definitions/product_id" },
+              "product_category": { "$ref": "#/definitions/product_category" },
+              "unit": { "$ref": "#/definitions/unit" },
+              "country": { "$ref": "#/definitions/country" }
+            }
+          }
+        }
+      }
+    },
+    "inventory_form_validation_failed": {
+      "description": "Un formulario de inventario falla la validación en un campo concreto. Nunca incluye el valor escrito.",
+      "category": "negocio", "group": "oportunidad", "delivery": "batch", "source": "frontend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "inventory_form_validation_failed" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["form", "field_name", "error_code"],
+            "properties": {
+              "form": { "type": "string", "enum": ["inbound_order", "outbound_order", "product_create"] },
+              "field_name": { "type": "string", "pattern": "^[a-z_]+$", "maxLength": 60 },
+              "error_code": { "type": "string", "enum": ["required", "invalid_type", "out_of_range", "too_long", "other"] },
+              "location_id": { "$ref": "#/definitions/location_id" }
+            }
+          }
+        }
+      }
+    },
+    "supplier_rate_changed": {
+      "description": "Se actualiza la tarifa de un proveedor.",
+      "category": "negocio", "group": "oportunidad", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "supplier_rate_changed" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["supplier_id", "country", "currency", "new_rate"],
+            "properties": {
+              "supplier_id": { "$ref": "#/definitions/positive_integer" },
+              "country": { "$ref": "#/definitions/country" },
+              "currency": { "$ref": "#/definitions/currency" },
+              "new_rate": { "$ref": "#/definitions/non_negative_number" }
+            }
+          }
+        }
+      }
+    },
+    "incident_created": {
+      "description": "Se registra una incidencia. No incluye la descripción (texto libre).",
+      "category": "negocio", "group": "oportunidad", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "incident_created" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["incident_id", "category", "status"],
+            "properties": {
+              "incident_id": { "$ref": "#/definitions/positive_integer" },
+              "category": { "type": "string", "minLength": 1, "maxLength": 60 },
+              "status": { "type": "string", "minLength": 1, "maxLength": 60 }
+            }
+          }
+        }
+      }
+    },
+    "login_succeeded": {
+      "description": "Un usuario inicia sesión correctamente.",
+      "category": "autenticacion", "group": "oportunidad", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "login_succeeded" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["auth_method"],
+            "properties": {
+              "auth_method": { "type": "string", "enum": ["password"] }
+            }
+          }
+        }
+      }
+    },
+    "login_failed": {
+      "description": "Un intento de inicio de sesión falla. Nunca incluye el usuario ni la contraseña; userId vale anonymous.",
+      "category": "autenticacion", "group": "oportunidad", "delivery": "stream", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "login_failed" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["failure_reason", "attempt_number_in_session"],
+            "properties": {
+              "failure_reason": { "type": "string", "enum": ["invalid_credentials", "validation_error", "service_error"] },
+              "attempt_number_in_session": { "$ref": "#/definitions/positive_integer" }
+            }
+          }
+        }
+      }
+    },
+    "session_expired": {
+      "description": "La sesión caduca o el token deja de ser válido con el usuario trabajando.",
+      "category": "autenticacion", "group": "oportunidad", "delivery": "batch", "source": "frontend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "session_expired" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["expiry_cause", "last_route"],
+            "properties": {
+              "expiry_cause": { "type": "string", "enum": ["token_expired", "token_invalid"] },
+              "last_route": { "$ref": "#/definitions/route_template" }
+            }
+          }
+        }
+      }
+    },
+    "password_changed": {
+      "description": "Un usuario cambia o restablece su contraseña. Nunca incluye la contraseña.",
+      "category": "autenticacion", "group": "oportunidad", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "password_changed" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["method"],
+            "properties": {
+              "method": { "type": "string", "enum": ["change_password", "reset_password"] }
+            }
+          }
+        }
+      }
+    },
+    "api_latency_recorded": {
+      "description": "Latencia agregada por ruta, método y clase de estado en ventanas de 60 segundos.",
+      "category": "rendimiento", "group": "oportunidad", "delivery": "batch", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "api_latency_recorded" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["method", "route_template", "status_class", "window_start", "window_seconds", "request_count", "p50_ms", "p95_ms", "max_ms"],
+            "properties": {
+              "method": { "$ref": "#/definitions/http_method" },
+              "route_template": { "$ref": "#/definitions/route_template" },
+              "status_class": { "type": "string", "enum": ["2xx", "3xx", "4xx", "5xx"] },
+              "window_start": { "type": "string", "format": "date-time" },
+              "window_seconds": { "type": "integer", "minimum": 1 },
+              "request_count": { "$ref": "#/definitions/positive_integer" },
+              "p50_ms": { "$ref": "#/definitions/non_negative_number" },
+              "p95_ms": { "$ref": "#/definitions/non_negative_number" },
+              "max_ms": { "$ref": "#/definitions/non_negative_number" }
+            }
+          }
+        }
+      }
+    },
+    "page_load_measured": {
+      "description": "Tiempo de carga de una pantalla del backoffice en el navegador.",
+      "category": "rendimiento", "group": "oportunidad", "delivery": "batch", "source": "frontend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "page_load_measured" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["route_template", "navigation_type", "load_ms"],
+            "properties": {
+              "route_template": { "$ref": "#/definitions/route_template" },
+              "navigation_type": { "type": "string", "enum": ["navigate", "reload", "back_forward"] },
+              "load_ms": { "$ref": "#/definitions/non_negative_number" },
+              "lcp_ms": { "$ref": "#/definitions/non_negative_number" }
+            }
+          }
+        }
+      }
+    },
+    "api_error_returned": {
+      "description": "La API devuelve una respuesta 5xx.",
+      "category": "errores", "group": "oportunidad", "delivery": "stream", "source": "backend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "api_error_returned" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["method", "route_template", "status_code", "error_category"],
+            "properties": {
+              "method": { "$ref": "#/definitions/http_method" },
+              "route_template": { "$ref": "#/definitions/route_template" },
+              "status_code": { "type": "integer", "minimum": 500, "maximum": 599 },
+              "error_category": { "type": "string", "enum": ["database_unavailable", "internal_error"] }
+            }
+          }
+        }
+      }
+    },
+    "frontend_error_captured": {
+      "description": "Un error del navegador, capturado o no, en una pantalla del backoffice. Sin mensaje ni traza.",
+      "category": "errores", "group": "oportunidad", "delivery": "batch", "source": "frontend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "frontend_error_captured" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["error_name", "error_fingerprint", "route_template", "handled"],
+            "properties": {
+              "error_name": { "type": "string", "maxLength": 80 },
+              "error_fingerprint": { "type": "string", "pattern": "^[0-9a-f]{8,64}$" },
+              "route_template": { "$ref": "#/definitions/route_template" },
+              "handled": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "page_viewed": {
+      "description": "El operador cambia de pantalla en el backoffice.",
+      "category": "navegacion", "group": "oportunidad", "delivery": "batch", "source": "frontend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "page_viewed" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["route_template", "section"],
+            "properties": {
+              "route_template": { "$ref": "#/definitions/route_template" },
+              "section": { "type": "string", "enum": ["home", "inventory", "suppliers", "incidents", "account", "auth", "candidates"] },
+              "referrer_route": { "$ref": "#/definitions/route_template" }
+            }
+          }
+        }
+      }
+    },
+    "flow_abandoned": {
+      "description": "El operador abandona un formulario iniciado sin enviarlo. Solo cuenta campos rellenos, no su contenido.",
+      "category": "navegacion", "group": "oportunidad", "delivery": "batch", "source": "frontend", "contains_pii": false,
+      "schema": {
+        "allOf": [{ "$ref": "#/definitions/envelope" }],
+        "properties": {
+          "event_type": { "const": "flow_abandoned" },
+          "properties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["flow", "last_step_reached", "elapsed_ms", "fields_filled_count"],
+            "properties": {
+              "flow": { "type": "string", "enum": ["inbound_order", "outbound_order", "incident_register", "supplier_create"] },
+              "last_step_reached": { "type": "string", "enum": ["form_opened", "field_edited", "validation_failed", "submit_started"] },
+              "elapsed_ms": { "$ref": "#/definitions/non_negative_number" },
+              "fields_filled_count": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

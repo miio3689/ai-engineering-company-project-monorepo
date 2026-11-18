@@ -351,3 +351,43 @@ Decidir **cómo contar las salidas de merma sin duplicarlas**. El BRIEFING defin
 | Categorías cubiertas | 5 (negocio, autenticación, rendimiento, errores, navegación) |
 | Eventos en stream / batch | 3 / 18 |
 | Eventos con allowlist de propiedades | 21 de 21 |
+
+## 11. Almacenamiento: mapeo a la tabla `telemetry_events`
+
+Cada evento aceptado se convierte en una fila de `telemetry_events` (Supabase). DDL en `services/api/sql/telemetry_events.sql`; explicación en `storage-notes.md`.
+
+| Columna | Origen |
+|---|---|
+| `id` | `eventId` |
+| `timestamp` | `timestamp` |
+| `service` | constante `backoffice` |
+| `event_type` | `event_type` |
+| `level` | por tipo de evento (tabla de abajo) |
+| `value` | número principal de `properties` (tabla de abajo) |
+| `message` | resumen legible por tipo de evento; nunca incluye `userId` ni `sessionId` |
+| `tags` | `properties` completas (solo claves del allowlist) + `session_id`, `user_id`, `request_id` y `schema_version` del envelope |
+
+Los identificadores del envelope se guardan en `tags` porque el análisis posterior los necesita (sesiones, embudos por usuario, correlación con los logs). Ninguna propiedad de ningún allowlist usa esos cuatro nombres, así que no puede haber colisiones. `userId` es un identificador interno pseudónimo (sección 7.4): solo vive en `tags` y nunca en `properties`.
+
+### Severidad (`level`)
+
+| `level` | Eventos |
+|---|---|
+| `error` | `api_error_returned`; `frontend_error_captured` con `handled = false` |
+| `warn` | `login_failed`, `session_expired`, `direct_stock_edit_rejected`, `outbound_order_rejected`, `stock_threshold_triggered`, `ingredient_price_variance_detected`; `frontend_error_captured` con `handled = true` |
+| `info` | el resto de los eventos |
+
+### Valor principal (`value`)
+
+| Evento | Propiedad copiada a `value` |
+|---|---|
+| `inbound_order_created`, `outbound_order_created`, `stock_waste_registered`, `stock_threshold_triggered`, `direct_stock_edit_rejected`, `outbound_order_rejected` | `quantity` |
+| `ingredient_price_variance_detected` | `variance_pct` |
+| `supplier_rate_changed` | `new_rate` |
+| `login_failed` | `attempt_number_in_session` |
+| `api_latency_recorded` | `p95_ms` |
+| `page_load_measured` | `load_ms` |
+| `flow_abandoned` | `elapsed_ms` |
+| resto | sin valor (`null`) |
+
+La dimensión específica de Brasaland (local, país, producto, moneda) permanece en `tags` y se consulta con el índice GIN, por ejemplo `tags @> '{"country":"CO","location_id":1}'`. Las cantidades y costes se guardan en la moneda del local, sin conversión.

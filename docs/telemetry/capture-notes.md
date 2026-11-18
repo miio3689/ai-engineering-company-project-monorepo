@@ -7,7 +7,7 @@ Complementa `telemetry-plan.md` (plan aprobado) y `event-schemas.json`. Describe
 - `track(eventType, properties)` en `uis/backoffice/services/telemetry.ts` es la única vía de captura. Añade sola `eventId`, `timestamp`, `sessionId`, `userId`, `schemaVersion` y `requestId`.
 - Cola en memoria → lote de hasta 20 eventos o cada 10 s → `POST` a `NEXT_PUBLIC_TELEMETRY_ENDPOINT`. Al esconder o cerrar la pestaña se envía lo pendiente con `navigator.sendBeacon`. Si el envío falla se reintenta hasta 3 veces con espera exponencial (1, 2 y 4 s) y después se descarta; un 4xx se descarta sin reintentar.
 - Solo pasan las propiedades de la allowlist de cada evento (`lib/telemetry-allowlist.ts`, generada desde `event-schemas.json` y comprobada por un test). Un evento desconocido se descarta.
-- El receptor es un stub (`POST /telemetry/events`): valida el formato, registra el recuento y el `event_type` y responde `{"received": N}`. No persiste nada.
+- El receptor (`POST /telemetry/events`) valida cada evento, guarda los válidos en Supabase y responde `{"received": N, "stored": M, "rejected": R}` (ver `storage-notes.md`).
 
 ## Eventos instrumentados (19 de 21): las 6 obligatorias del BRIEFING y 13 identificados
 
