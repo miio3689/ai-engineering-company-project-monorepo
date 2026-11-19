@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test:auth": "node --test tests/auth.test.mjs",
     "typecheck": "tsc --noEmit",
-    "test:telemetry": "node --test tests/telemetry.test.mjs tests/inventory-telemetry.test.mjs"
+    "test:telemetry": "node --test tests/telemetry.test.mjs tests/inventory-telemetry.test.mjs tests/telemetry-report.test.mjs"
   },
   "dependencies": {
     "next": "16.3.0",
