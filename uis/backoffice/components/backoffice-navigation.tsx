@@ -13,6 +13,7 @@ const links = [
   { href: "/incidents/list", label: "Gestor de incidencias" },
   { href: "/suppliers", label: "Proveedores" },
   { href: "/inventory/products", label: "Inventario" },
+  { href: "/telemetry", label: "Telemetría" },
   { href: "/account/profile", label: "Mi perfil" },
   { href: "/account/change-password", label: "Cambiar contraseña" },
 ];
