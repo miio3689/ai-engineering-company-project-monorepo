@@ -1135,6 +1135,95 @@ class InventoryRoutesTests(unittest.TestCase):
             "#/components/schemas/StockEditRejection",
         )
 
+    def test_waste_reference_cost_is_mean_of_five_most_recent_product_entries(self):
+        from datetime import datetime, timedelta, timezone
+
+        product = self.create_product()
+        with Session(self.engine) as session:
+            for day, cost in enumerate((10, 20, 30, 40, 50, 60)):
+                session.add(
+                    IngredientEntry(
+                        ingredient_id=product["id"],
+                        quantity=10,
+                        supplier_name="Proveedor",
+                        unit_cost=cost,
+                        location_id=1,
+                        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc)
+                        + timedelta(days=day),
+                        user_uuid=str(self.user_id),
+                    )
+                )
+            session.commit()
+
+        response = self.client.post(
+            "/inventory/orders/outbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 1,
+                "reason": "waste",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.json()["reference_unit_cost"], 40.0)
+
+        orders = self.client.get("/inventory/orders", headers=self.headers)
+        self.assertEqual(orders.status_code, 200, orders.text)
+
+    def test_consumption_reference_cost_is_null(self):
+        product = self.create_product()
+        inbound = self.client.post(
+            "/inventory/orders/inbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 4,
+                "supplier_name": "Proveedor",
+                "unit_cost": 12,
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(inbound.status_code, 201, inbound.text)
+        response = self.client.post(
+            "/inventory/orders/outbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 1,
+                "reason": "consumption",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertIsNone(response.json()["reference_unit_cost"])
+
+    def test_waste_without_cost_history_returns_null(self):
+        product = self.create_product()
+        inbound = self.client.post(
+            "/inventory/orders/inbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 4,
+                "supplier_name": "Proveedor sin costo",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(inbound.status_code, 201, inbound.text)
+        response = self.client.post(
+            "/inventory/orders/outbound",
+            json={
+                "ingredient_id": product["id"],
+                "quantity": 1,
+                "reason": "waste",
+                "location_id": 1,
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertIsNone(response.json()["reference_unit_cost"])
+
     def _seed_ingredients_and_movements(self, count, start_index=0):
         with Session(self.engine) as session:
             for index in range(start_index, start_index + count):

@@ -175,6 +175,43 @@ test("la merma emite solo stock_waste_registered con motivo; sin motivo no emite
   assert.deepEqual(await takeEvents(), []);
 });
 
+test("solo la merma incluye el coste de referencia cuando es positivo", async () => {
+  inventoryTelemetry.trackOutboundCreated(
+    ingredient(),
+    outboundInput({ reason: "waste" }),
+    inventoryOrder("outbound", { reason: "waste", reference_unit_cost: 17.25 }),
+    "expired",
+    null,
+  );
+  const [pricedWaste] = await takeEvents();
+  assert.equal(pricedWaste.event_type, "stock_waste_registered");
+  assert.equal(pricedWaste.properties.unit_cost, 17.25);
+
+  for (const reference_unit_cost of [null, undefined]) {
+    inventoryTelemetry.trackOutboundCreated(
+      ingredient(),
+      outboundInput({ reason: "waste" }),
+      inventoryOrder("outbound", { reason: "waste", reference_unit_cost }),
+      "expired",
+      null,
+    );
+    const [unpricedWaste] = await takeEvents();
+    assert.equal(unpricedWaste.event_type, "stock_waste_registered");
+    assert.equal(Object.hasOwn(unpricedWaste.properties, "unit_cost"), false);
+  }
+
+  inventoryTelemetry.trackOutboundCreated(
+    ingredient(),
+    outboundInput({ reason: "consumption" }),
+    inventoryOrder("outbound", { reason: "consumption", reference_unit_cost: 17.25 }),
+    null,
+    null,
+  );
+  const [consumption] = await takeEvents();
+  assert.equal(consumption.event_type, "outbound_order_created");
+  assert.equal(Object.hasOwn(consumption.properties, "unit_cost"), false);
+});
+
 test("el umbral se emite solo al cruzarlo hacia abajo y depende de la unidad", async () => {
   inventoryTelemetry.trackOutboundCreated(
     ingredient({ unit: "kg" }),

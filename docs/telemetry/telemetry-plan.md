@@ -200,7 +200,7 @@ Las propiedades obligatorias van en la columna 2; las opcionales, en la 3. Los s
 |---|---|---|
 | `inbound_order_created` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `inbound_order_id`, `supplier_name` | `unit_cost` |
 | `outbound_order_created` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `outbound_order_id` | — |
-| `stock_waste_registered` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `outbound_order_id`, `reason` | — |
+| `stock_waste_registered` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `outbound_order_id`, `reason` | `unit_cost` |
 | `stock_threshold_triggered` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `threshold_quantity`, `triggering_outbound_order_id` | — |
 | `direct_stock_edit_rejected` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `attempted_operation`, `rejection_reason` | — |
 | `ingredient_price_variance_detected` | `location_id`, `country`, `product_id`, `product_category`, `quantity`, `unit`, `currency`, `inbound_order_id`, `supplier_name`, `unit_cost`, `baseline_unit_cost`, `variance_pct`, `threshold_pct` | — |
@@ -228,6 +228,7 @@ Las propiedades obligatorias van en la columna 2; las opcionales, en la 3. Los s
 | `unit_cost` | entrada, variación de precio | Número > 0, en la `currency` del local. **Opcional hasta que el modelo guarde el coste (B1)** |
 | `baseline_unit_cost`, `variance_pct`, `threshold_pct` | variación de precio | Coste de referencia (media de las últimas 5 entradas del mismo producto y proveedor), variación en porcentaje y umbral aplicado (10) |
 | `reason` | merma | `expired`, `kitchen_error` o `theft_suspected` (requiere B2) |
+| `unit_cost` | merma | Número > 0, en la `currency` del local. Coste de referencia por unidad: media de las últimas 5 `unit_cost` de entradas del mismo producto, calculado por la API. Opcional; versión de esquema 1.1.0 |
 | `threshold_quantity` | umbral | Mínimo configurado para ese producto y local (requiere B4); `quantity` es el stock actual tras la orden |
 | `triggering_outbound_order_id` | umbral | Orden de salida que provocó el cruce |
 | `attempted_operation` | edición directa | `set_stock`, `adjust_stock` u `other`; `quantity` es la cantidad que se intentó fijar |

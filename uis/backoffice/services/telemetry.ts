@@ -15,7 +15,7 @@ export interface TelemetryEvent {
   properties: TelemetryProperties;
 }
 
-export const TELEMETRY_SCHEMA_VERSION = "1.0.0";
+export const TELEMETRY_SCHEMA_VERSION = "1.1.0";
 export const FLUSH_INTERVAL_MS = 10_000;
 export const MAX_BATCH_SIZE = 20;
 export const MAX_RETRIES = 3;

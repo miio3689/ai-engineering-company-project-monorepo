@@ -3,7 +3,7 @@
   "$id": "https://brasaland.example/telemetry/event-schemas.json",
   "title": "Brasaland telemetry event schemas",
   "description": "Esquemas JSON Schema draft-07 de los 21 eventos del plan de telemetría. Cada evento valida contra events.<event_type>.schema.",
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "definitions": {
     "uuid": {
       "type": "string",
@@ -118,7 +118,8 @@
               "unit": { "$ref": "#/definitions/unit" },
               "currency": { "$ref": "#/definitions/currency" },
               "outbound_order_id": { "$ref": "#/definitions/positive_integer" },
-              "reason": { "type": "string", "enum": ["expired", "kitchen_error", "theft_suspected"] }
+              "reason": { "type": "string", "enum": ["expired", "kitchen_error", "theft_suspected"] },
+              "unit_cost": { "$ref": "#/definitions/positive_number" }
             }
           }
         }

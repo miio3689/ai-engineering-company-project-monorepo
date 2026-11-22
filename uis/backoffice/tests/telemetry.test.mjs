@@ -96,7 +96,7 @@ test("track añade solo los campos del envelope automáticamente", async () => {
   assert.match(event.requestId, UUID);
   assert.equal(event.userId, "7");
   assert.equal(event.event_type, "page_viewed");
-  assert.equal(event.schemaVersion, "1.0.0");
+  assert.equal(event.schemaVersion, "1.1.0");
   assert.ok(!Number.isNaN(Date.parse(event.timestamp)));
   assert.deepEqual(event.properties, page());
 });
