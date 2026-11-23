@@ -230,6 +230,10 @@ def get_latest_run(engine: Engine | None = None) -> dict[str, Any] | None:
     run = dict(row)
     for key in ("run_id", "resumed_from_run_id"):
         run[key] = _text_id(run[key])
+    # Postgres returns date objects; drivers without a native date type return text.
+    for key in ("window_start", "window_end"):
+        if isinstance(run[key], str):
+            run[key] = date.fromisoformat(run[key][:10])
     details = run["details"]
     run["details"] = json.loads(details) if isinstance(details, str) else (details or {})
     return run

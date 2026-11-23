@@ -187,9 +187,13 @@ def load_weekly(
     return counts
 
 
+def _utc_today() -> date:
+    return datetime.now(timezone.utc).date()
+
+
 def _default_week(connection: Connection) -> date | None:
     """Most recent CLOSED week; if there is none, the most recent computed week."""
-    cutoff = monday_of(datetime.now(timezone.utc).date()) - timedelta(days=7)
+    cutoff = monday_of(_utc_today()) - timedelta(days=7)
     closed = connection.execute(
         text(
             "select max(week_start) from reporting.weekly_location_performance "

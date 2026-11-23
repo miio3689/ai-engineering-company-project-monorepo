@@ -116,7 +116,9 @@ class ReportingEndpointTests(unittest.TestCase):
             },
         )
 
-    def test_default_week_uses_latest_closed_week_or_latest_available(self):
+    # "Today" is fixed inside the week of 2026-11-16, so the latest closed week is 2026-11-09.
+    @patch("data.pipelines.queries._utc_today", return_value=date(2026, 11, 18))
+    def test_default_week_uses_latest_closed_week_or_latest_available(self, _today):
         self._insert_week("1", "2026-11-09", total_purchase_cost=90)
         self._insert_week("1", "2026-11-16", total_purchase_cost=10)
         response = self.client.get("/reporting/weekly-location-performance")

@@ -117,7 +117,7 @@ def insert_event(
     with engine.begin() as connection:
         connection.execute(
             insert(telemetry_events).values(
-                id=identifier,
+                id=uuid.UUID(identifier),
                 timestamp=ts.astimezone(timezone.utc),
                 service="backoffice",
                 event_type=event_type,

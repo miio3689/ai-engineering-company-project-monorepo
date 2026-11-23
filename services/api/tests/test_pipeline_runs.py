@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 import unittest
 from unittest.mock import patch
 
-from sqlalchemy import text
+from sqlalchemy import DateTime, bindparam, text
 
 from data.pipelines import runs
 from services.api.tests.pipeline_helpers import create_schema, make_engine
@@ -63,13 +63,14 @@ class PipelineRunsTests(unittest.TestCase):
                     "(run_id, pipeline_name, trigger_type, window_start, window_end, "
                     "status, phase, started_at, details) values "
                     "(:id, :name, 'schedule', :start, :end, 'running', 'extract', :started, '{}')"
-                ),
+                    # Same timestamp type as runs.open_run, so the stale cutoff compares like for like.
+                ).bindparams(bindparam("started", type_=DateTime(timezone=True))),
                 {
                     "id": stale_id,
                     "name": runs.PIPELINE_NAME,
                     "start": START.isoformat(),
                     "end": END.isoformat(),
-                    "started": started.isoformat(),
+                    "started": started,
                 },
             )
         new_id = self.open()
