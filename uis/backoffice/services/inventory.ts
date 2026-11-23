@@ -108,7 +108,9 @@ function isInventoryOrder(value: unknown): value is InventoryOrder {
   }
   return value.type === "outbound"
     && typeof value.reason === "string"
-    && EXIT_REASONS.includes(value.reason as ExitReason);
+    && EXIT_REASONS.includes(value.reason as ExitReason)
+    && (value.reference_unit_cost === undefined || value.reference_unit_cost === null
+      || (typeof value.reference_unit_cost === "number" && Number.isFinite(value.reference_unit_cost)));
 }
 
 function isInventoryOrderList(value: unknown): value is InventoryOrder[] {

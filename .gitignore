@@ -13,3 +13,7 @@ services/api/.loadtest/
 *.db
 *_small.json
 *_large.json
+
+# Salidas del pipeline de reporting
+data/eval/*.json
+data/eval/*.log

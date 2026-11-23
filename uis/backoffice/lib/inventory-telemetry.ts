@@ -71,7 +71,13 @@ export function trackOutboundCreated(
   const base = eventBase(ingredient, input.location_id, input.quantity);
   if (input.reason === "waste") {
     if (wasteReason) {
-      track("stock_waste_registered", { ...base, outbound_order_id: order.id, reason: wasteReason });
+      const referenceCost = order.type === "outbound" ? order.reference_unit_cost : null;
+      track("stock_waste_registered", {
+        ...base,
+        outbound_order_id: order.id,
+        reason: wasteReason,
+        unit_cost: referenceCost && referenceCost > 0 ? referenceCost : undefined,
+      });
     }
   } else {
     track("outbound_order_created", { ...base, outbound_order_id: order.id });

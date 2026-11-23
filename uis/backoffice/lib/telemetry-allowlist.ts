@@ -3,7 +3,7 @@
 export const TELEMETRY_ALLOWLIST: Record<string, readonly string[]> = {
   inbound_order_created: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "inbound_order_id", "supplier_name", "unit_cost"],
   outbound_order_created: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "outbound_order_id"],
-  stock_waste_registered: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "outbound_order_id", "reason"],
+  stock_waste_registered: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "outbound_order_id", "reason", "unit_cost"],
   stock_threshold_triggered: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "threshold_quantity", "triggering_outbound_order_id"],
   direct_stock_edit_rejected: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "attempted_operation", "rejection_reason"],
   ingredient_price_variance_detected: ["location_id", "country", "product_id", "product_category", "quantity", "unit", "currency", "inbound_order_id", "supplier_name", "unit_cost", "baseline_unit_cost", "variance_pct", "threshold_pct"],

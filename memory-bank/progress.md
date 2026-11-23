@@ -385,3 +385,39 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   ejemplo `203.0.113.10`.
 - Validado en el contenedor `uis`: `npm run typecheck` pasó sin errores y `next dev` arrancó con `NEXT_ALLOWED_DEV_ORIGINS` definida, cargando `next.config.ts` sin errores; el backoffice respondió 200.
 - Validado en el VPS el 2026-11-12: con la variable definida con la IP del servidor, el navegador carga `/_next/*` sin errores 403 y el inicio de sesión funciona.
+
+## Pipeline de Desempeño de Negocio Resiliente (Parte 2 de 3)
+
+- Flow de Prefect 3 `weekly-location-performance` en `data/pipelines/pipeline.py`
+  con las tasks `open_run`, `extract_telemetry_events`, `extract_location_dim`,
+  `check_source_health` (opcional), `transform_weekly_metrics`,
+  `load_weekly_location_performance`, `export_eval_snapshot` (opcional) y
+  `close_run`. La transformación pura con Pandas vive en
+  `data/process/weekly_location_performance.py`.
+- Resiliencia: reintentos justificados en las tasks que tocan la base de datos,
+  pasos opcionales invocados con `return_state=True` y caché de 1 hora en
+  `transform_weekly_metrics` (`cache_key_fn` + `cache_expiration`).
+- Carga idempotente con upsert sobre `unique (location_id, week_start)` de
+  `reporting.weekly_location_performance`. Cada corrida queda registrada en
+  `reporting.pipeline_runs`, que también actúa como bloqueo entre corridas.
+- Endpoints en `services/reporting/`, separados de `services/telemetry/`:
+  `GET /reporting/weekly-location-performance`,
+  `GET /reporting/pipeline-runs/latest` y `POST /reporting/pipeline-runs`.
+  `telemetry_events` y `services/telemetry/analysis.py` no se modificaron.
+- Ejecución: `uv run python data/pipelines/pipeline.py`, semanal los lunes a las
+  05:00 UTC (`--serve`), documentada en `data/pipelines/PIPELINE_DESIGN.md`.
+- Validado el 2026-11-23:
+  - Suite completa (232 tests) en verde, tras corregir tests que dependían de
+    la fecha actual y helpers de SQLite.
+  - Contra Supabase, dos corridas seguidas: la primera insertó 56 filas
+    (14 locales x 4 semanas); la segunda dejó las 56 sin cambios y reutilizó la
+    caché de la transformación.
+  - Los tres endpoints respondieron 200/202, y 409 ante una corrida concurrente.
+- Entorno local: Python 3.13 gestionado por `uv` (Python 3.15 no tiene wheel de
+  `pyyaml` 6.0.3). Con SQLAlchemy 2.1, `DATABASE_URL` debe usar
+  `postgresql+psycopg2://`, porque `postgresql://` usa psycopg 3, que no está
+  instalado.
+- Pendiente: la telemetría solo tiene un evento de KPI, así que casi todos los
+  KPIs valen 0. Hay que generar movimientos de inventario antes del dashboard de
+  la Parte 3. Las cifras de inventario de la semana del 2026-11-02 no emitieron
+  eventos (detectado por `check_source_health`).

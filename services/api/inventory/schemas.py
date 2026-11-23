@@ -105,6 +105,7 @@ class InboundOrderRead(InventoryMovementRead):
 class OutboundOrderRead(InventoryMovementRead):
     type: Literal["outbound"]
     reason: ExitReason
+    reference_unit_cost: float | None = None
 
 
 InventoryOrderRead: TypeAlias = Annotated[

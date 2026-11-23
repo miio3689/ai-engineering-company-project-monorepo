@@ -390,11 +390,11 @@ Estructura prevista:
 ```text
 data/
   pipelines/
-    weekly_location_performance/
-      flow.py            # flow y tasks de Prefect
-      queries.py         # SQL de extracción, conciliación y upsert
-      runs.py            # abrir, cerrar y consultar corridas (pipeline_runs)
-      sql/               # DDL del esquema reporting
+    pipeline.py          # punto de entrada: flow, tasks de Prefect y CLI
+    db.py                # conexión a la base de datos (sin depender de services/)
+    queries.py           # SQL de extracción, conciliación y upsert
+    runs.py              # abrir, cerrar y consultar corridas (pipeline_runs)
+    sql/                 # DDL del esquema reporting y semilla de location_dim
   process/
     weekly_location_performance.py   # funciones puras de Pandas
 services/
@@ -407,9 +407,9 @@ services/
 
 | Endpoint | Función de `data/pipelines/` | Respuesta |
 |---|---|---|
-| `GET /reporting/weekly-location-performance?week_start=` | `weekly_location_performance.queries.get_weekly_performance(week_start)` | `week_start` (por defecto, la semana calculada más reciente) y la lista de locales con los cinco KPI y `currency` |
-| `GET /reporting/pipeline-runs/latest` | `weekly_location_performance.runs.get_latest_run()` | Estado y metadatos de la última corrida (`run_id`, `status`, `phase`, `started_at`, `finished_at`, recuentos, `error_message`, `details`) |
-| `POST /reporting/pipeline-runs` | `weekly_location_performance.runs.trigger_run(week_start=None, lookback_weeks=4)` | `202` con `{"run_id", "status": "running"}`, o `409` si ya hay una corrida activa |
+| `GET /reporting/weekly-location-performance?week_start=` | `data.pipelines.queries.get_weekly_performance(week_start)` | `week_start` (por defecto, la semana calculada más reciente) y la lista de locales con los cinco KPI y `currency` |
+| `GET /reporting/pipeline-runs/latest` | `data.pipelines.runs.get_latest_run()` | Estado y metadatos de la última corrida (`run_id`, `status`, `phase`, `started_at`, `finished_at`, recuentos, `error_message`, `details`) |
+| `POST /reporting/pipeline-runs` | `data.pipelines.runs.trigger_run(reference_date=None, lookback_weeks=4)` | `202` con `{"run_id", "status": "running"}`, o `409` si ya hay una corrida activa |
 
 `trigger_run` abre la corrida (y con ello toma el bloqueo) **antes** de lanzar el flow, y le pasa el `run_id`: así el `POST` puede responder enseguida con el identificador y la corrida activa queda protegida del cron.
 
@@ -489,3 +489,51 @@ El BRIEFING exige un coste en `stock_waste_registered`; hoy solo `inbound_order_
 | 5 | Prefect aún no está instalado: la Parte 2 añadirá la dependencia (y su servidor o Prefect Cloud) | Parte 2 |
 | 6 | El umbral de quiebre de stock es una constante del frontend (G6); moverlo a configuración en servidor sería una mejora futura | Futuro |
 | 7 | Conversión de monedas: fuera de alcance de la v1 (no hay fuente de tipo de cambio) | v2 |
+
+## 6. Implementación (Parte 2)
+
+### 6.1 Cómo ejecutarlo
+
+Desde la raíz del repositorio:
+
+```bash
+uv run python data/pipelines/pipeline.py                      # recalcula las últimas 4 semanas ISO
+uv run python data/pipelines/pipeline.py --lookback-weeks 8   # ventana más larga
+uv run python data/pipelines/pipeline.py --reference-date 2026-11-16
+uv run python data/pipelines/pipeline.py --serve              # programa el flow cada lunes 05:00 UTC
+```
+
+Requisitos previos (una sola vez): crear el esquema `reporting` ejecutando `data/pipelines/sql/reporting_schema.sql` y sembrar los 14 locales con `data/pipelines/sql/location_dim_seed.sql` en el SQL Editor de Supabase. La conexión se lee de `DATABASE_URL` o, si no existe, del bloque Secret de Prefect `supabase-database-url`.
+
+**Frecuencia prevista:** semanal, lunes 05:00 UTC (medianoche en Bogotá), para que el dato esté fresco el lunes por la mañana. Cada corrida recalcula las 4 últimas semanas ISO; además puede dispararse a mano con `POST /reporting/pipeline-runs`.
+
+### 6.2 Qué se implementó y dónde
+
+| Pieza | Archivo |
+|---|---|
+| Flow `weekly-location-performance` y sus tasks | `data/pipelines/pipeline.py` |
+| SQL de extracción, conciliación y upsert | `data/pipelines/queries.py` |
+| Registro de corridas, bloqueo y disparo manual | `data/pipelines/runs.py` |
+| Transformación con Pandas (funciones puras) | `data/process/weekly_location_performance.py` |
+| DDL del esquema `reporting` y semilla de `location_dim` | `data/pipelines/sql/` |
+| Endpoints | `services/reporting/router.py` |
+
+Tasks: `open_run`, `extract_telemetry_events`, `extract_location_dim`, `check_source_health` (opcional), `transform_weekly_metrics`, `load_weekly_location_performance`, `export_eval_snapshot` (opcional) y `close_run`.
+
+### 6.3 Resiliencia
+
+- **Reintentos:** 3 con esperas de 10, 30 y 90 s en las lecturas y la carga (cubren un reinicio de Supabase de unos 2 minutos sin ocultar una caída real); 2 en `open_run` y en `check_source_health`; la transformación no se reintenta porque es una función pura.
+- **Fallos parciales:** `check_source_health` y `export_eval_snapshot` se invocan con `return_state=True`: si fallan, la corrida continúa y termina `completed_with_warnings`.
+- **Caché:** `transform_weekly_metrics` se cachea 1 hora; la clave es la ventana más un hash de los ids de los eventos y de `location_dim`.
+- **Idempotencia:** se recalcula la ventana completa y se compara con lo guardado; solo se escriben filas nuevas o cambiadas, con `upsert` por `(location_id, week_start)` en una sola transacción. Una segunda corrida sobre los mismos datos deja la tabla idéntica y registra `rows_unchanged`.
+- **Registro:** `reporting.pipeline_runs` guarda ventana, estado, fase (punto de control), recuentos, error y calidad (`details`); su índice parcial único es el bloqueo.
+
+### 6.4 Desviaciones respecto al diseño
+
+- **Estructura de carpetas plana** (`data/pipelines/pipeline.py`, `queries.py`, `runs.py`, `db.py`) en vez de una subcarpeta por pipeline; el punto de entrada se llama `pipeline.py` como pide el ticket.
+- **Semana por defecto del endpoint de KPIs:** la última semana **cerrada**, no la más reciente calculada (el lunes por la mañana la semana más reciente acaba de empezar y está casi vacía). Si no existe ninguna cerrada, se devuelve la más reciente.
+- **Disparo manual:** `POST /reporting/pipeline-runs` abre la corrida (y el bloqueo) y lanza el flow en un proceso aparte; la API no carga Prefect.
+- **Conciliación por semana:** compara, por semana, los eventos de telemetría con las filas de `ingredient_entry` e `ingredient_exit` (merma); la comparación por local queda para una versión posterior.
+- **Coste de la merma:** el evento `stock_waste_registered` lleva `unit_cost` (coste de referencia calculado por la API, esquema `1.1.0`); los eventos anteriores no lo tienen y cuentan en `events_without_cost`.
+- **País del local:** `reporting.location_dim` se siembra con el país observado en los eventos (Colombia por defecto) y debe confirmarlo el negocio.
+- **Docker:** `services/reporting/` importa de `data/pipelines/`; para desplegar la API en un contenedor hay que añadir `data` como contexto de construcción (`additional_contexts`) y copiarlo en la imagen. Queda pendiente para el despliegue.

@@ -66,6 +66,23 @@ def inbound_order_properties():
     }
 
 
+def stock_waste_properties(unit_cost=None):
+    properties = {
+        "location_id": 1,
+        "country": "CO",
+        "product_id": 7,
+        "product_category": "meat",
+        "quantity": 2,
+        "unit": "kg",
+        "currency": "COP",
+        "outbound_order_id": 45,
+        "reason": "expired",
+    }
+    if unit_cost is not None:
+        properties["unit_cost"] = unit_cost
+    return properties
+
+
 def event_properties(event_type):
     properties_by_type = {
         "page_viewed": {
@@ -200,6 +217,47 @@ class TelemetryEventsTests(unittest.TestCase):
             response.json(), {"received": 6, "stored": 1, "rejected": 5}
         )
         self.assertEqual([str(row["id"]) for row in self.rows()], [valid["eventId"]])
+
+    def test_waste_unit_cost_is_optional_positive_and_not_allowed_for_consumption(self):
+        valid = make_event(
+            "stock_waste_registered",
+            properties=stock_waste_properties(12.5),
+            schemaVersion="1.1.0",
+        )
+        response = self.post([valid])
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json(), {"received": 1, "stored": 1, "rejected": 0})
+        stored = {str(row["id"]): row for row in self.rows()}[valid["eventId"]]
+        self.assertEqual(stored["tags"]["unit_cost"], 12.5)
+
+        for cost in (0, -1):
+            with self.subTest(unit_cost=cost):
+                invalid = make_event(
+                    "stock_waste_registered",
+                    properties=stock_waste_properties(cost),
+                    schemaVersion="1.1.0",
+                )
+                rejected = self.post([invalid])
+                self.assertEqual(rejected.status_code, 200, rejected.text)
+                self.assertEqual(
+                    rejected.json(),
+                    {"received": 1, "stored": 0, "rejected": 1},
+                )
+
+        consumption = make_event(
+            "outbound_order_created",
+            properties={
+                **stock_waste_properties(),
+                "unit_cost": 12.5,
+            },
+            schemaVersion="1.1.0",
+        )
+        rejected = self.post([consumption])
+        self.assertEqual(rejected.status_code, 200, rejected.text)
+        self.assertEqual(
+            rejected.json(),
+            {"received": 1, "stored": 0, "rejected": 1},
+        )
 
     def test_non_object_events_count_as_rejected(self):
         valid = make_event()
