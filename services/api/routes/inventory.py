@@ -273,6 +273,22 @@ def _price_variance(session: Session, order: EntryCreate) -> PriceVarianceRead |
     )
 
 
+def _reference_unit_cost(session: Session, ingredient_id: int) -> float | None:
+    """Reference cost of a wasted unit: mean unit cost of the last inbound entries."""
+    costs = session.exec(
+        select(IngredientEntry.unit_cost)
+        .where(
+            IngredientEntry.ingredient_id == ingredient_id,
+            IngredientEntry.unit_cost.is_not(None),
+        )
+        .order_by(IngredientEntry.created_at.desc(), IngredientEntry.id.desc())
+        .limit(PRICE_BASELINE_ENTRIES)
+    ).all()
+    if not costs:
+        return None
+    return round(sum(costs) / len(costs), 4)
+
+
 @router.post(
     "/orders/inbound",
     response_model=InboundOrderRead,
@@ -368,6 +384,11 @@ def create_outbound_order(
             **order.model_dump(),
             user_uuid=str(current_user.id),
         )
+        reference_unit_cost = (
+            _reference_unit_cost(session, ingredient.id)
+            if order.reason == "waste"
+            else None
+        )
         session.add(exit_record)
         session.commit()
         inventory_cache.invalidate(PRODUCTS_CACHE_KEY)
@@ -388,6 +409,7 @@ def create_outbound_order(
         created_at=exit_record.created_at,
         user_uuid=exit_record.user_uuid,
         reason=exit_record.reason,
+        reference_unit_cost=reference_unit_cost,
     )
 
 
@@ -425,7 +447,11 @@ def reject_direct_stock_edit(
     )
 
 
-@router.get("/orders", response_model=list[InventoryOrderRead])
+@router.get(
+    "/orders",
+    response_model=list[InventoryOrderRead],
+    response_model_exclude={"__all__": {"reference_unit_cost"}},
+)
 def list_orders(
     _current_user: UserResponse = Depends(get_current_user),
     session: Session = Depends(get_db),

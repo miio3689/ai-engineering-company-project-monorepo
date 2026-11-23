@@ -52,6 +52,7 @@ export interface InboundOrder extends InventoryOrderBase {
 export interface OutboundOrder extends InventoryOrderBase {
   type: "outbound";
   reason: ExitReason;
+  reference_unit_cost?: number | null;
 }
 
 export type InventoryOrder = InboundOrder | OutboundOrder;
