@@ -1,0 +1,8 @@
+# Nightly jobs of Brasaland (dedicated scheduler container, TZ=UTC).
+# Format of /etc/cron.d: minute hour day-of-month month day-of-week user command
+#
+# 02:00 UTC every day: export yesterday's telemetry (UTC) to data/raw/ and run
+# the business performance pipeline. Logs go to the container output
+# (docker compose logs scheduler).
+SHELL=/bin/bash
+0 2 * * * root . /app/.cron-env && cd /app && /usr/local/bin/python scripts/nightly_export.py > /proc/1/fd/1 2>&1
