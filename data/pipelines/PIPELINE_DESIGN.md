@@ -537,3 +537,63 @@ Tasks: `open_run`, `extract_telemetry_events`, `extract_location_dim`, `check_so
 - **Coste de la merma:** el evento `stock_waste_registered` lleva `unit_cost` (coste de referencia calculado por la API, esquema `1.1.0`); los eventos anteriores no lo tienen y cuentan en `events_without_cost`.
 - **País del local:** `reporting.location_dim` se siembra con el país observado en los eventos (Colombia por defecto) y debe confirmarlo el negocio.
 - **Docker:** `services/reporting/` importa de `data/pipelines/`; para desplegar la API en un contenedor hay que añadir `data` como contexto de construcción (`additional_contexts`) y copiarlo en la imagen. Queda pendiente para el despliegue.
+
+
+## 7. Subflows, tests y dashboard (Parte 3)
+
+### 7.1 Topología de subflows
+
+El flow principal `weekly_location_performance_flow` ya no contiene lógica de ETL: abre y cierra la corrida (bloqueo y punto de control `phase` en `reporting.pipeline_runs`) e invoca un subflow (`@flow`) por fase. Cada subflow recibe todo por parámetros y devuelve su resultado; no comparten variables globales, así que cada uno se puede ejecutar por separado (lo comprueba `test_each_subflow_runs_on_its_own_with_explicit_inputs`).
+
+| Subflow | Fase | Entradas | Salida | Tasks |
+|---|---|---|---|---|
+| `extract_weekly_location_sources` | extracción | `window_start`, `window_end` | `events`, `location_dim`, `source_total_events` | `extract_telemetry_events`, `extract_location_dim` |
+| `check_weekly_source_health` | calidad (**opcional**, `return_state=True`) | `events`, ventana | `silent_locations`, `reconciliation` | `check_source_health` |
+| `transform_weekly_location_kpis` | transformación | `events`, `location_dim`, ventana | `weekly` (columnas de la tabla de destino), `stats` | `prepare_kpi_facts` y una task por KPI (abajo) |
+| `publish_weekly_location_performance` | carga | `weekly`, ventana | `rows_inserted`, `rows_updated`, `rows_unchanged`, `weeks_revised` | `load_weekly_location_performance` (upsert) |
+| `export_weekly_eval_snapshot` | exportación (**opcional**, `return_state=True`) | `weekly`, `run_id` | ruta del JSON en `data/eval/` | `export_eval_snapshot` |
+
+Tasks de transformación, una por KPI del BRIEFING (funciones puras de `data/process/weekly_location_performance.py`):
+
+| Task | KPI del BRIEFING | Columna |
+|---|---|---|
+| `prepare_kpi_facts` | (preparación: deduplica, rechaza local desconocido o moneda distinta, coste = `quantity × unit_cost`) | — |
+| `calculate_purchase_cost_per_location` | Costo de compra por local | `total_purchase_cost` |
+| `calculate_waste_cost_per_location` | Costo de merma por local | `total_waste_cost` |
+| `count_stockout_events_per_location` | Frecuencia de quiebre de stock | `stockout_events_count` |
+| `count_price_alert_events_per_location` | Frecuencia de alertas de precio | `price_alert_events_count` |
+| `calculate_waste_ratio_per_location` | Ratio de merma (sobre la rejilla completa local × semana) | `waste_ratio` |
+
+**Caché:** pasa de `transform_weekly_metrics` a `prepare_kpi_facts`, que es la parte cara (aplanar `tags`, deduplicar, rechazar). La clave es el hash de los ids de los eventos y de `location_dim`, con la misma expiración de 1 hora. Las tasks de KPI son agregaciones baratas y no se cachean (`NO_CACHE`). `transform_weekly_metrics` se conserva como función pura que compone las mismas piezas.
+
+La sección 4.2 describe las tasks de la Parte 2; esta tabla la sustituye para la transformación.
+
+### 7.2 Tests unitarios
+
+`tests/pipelines/test_pipeline.py` prueba las tasks de transformación de forma aislada (`task.fn`, sin base de datos, sin API y sin servidor de Prefect), con filas en memoria con la forma de `telemetry_events` (`id`, `timestamp`, `event_type`, `tags`):
+
+- una prueba por KPI;
+- un caso calculado a mano contra la definición del BRIEFING (Local 1: compra 50.000 COP, merma 10.000 COP, ratio 0,2, 2 quiebres, 1 alerta);
+- comportamiento defensivo: coste nulo o no numérico (no suma y cuenta en `events_without_cost`), `tags` nulo o de tipo incorrecto, local desconocido, moneda distinta, y una entrada que no es un `DataFrame` o a la que le faltan columnas (`TypeError` / `ValueError`).
+
+```bash
+uv run --group test python -m pytest tests/pipelines/test_pipeline.py
+```
+
+### 7.3 CLI
+
+El punto de entrada y los comandos de la sección 6.1 no cambian: `uv run python data/pipelines/pipeline.py` sigue ejecutando el ETL completo.
+
+### 7.4 Dashboard
+
+Página `/reporting` del backoffice ("Reporte semanal" en la navegación), para Mariana (CEO) y Felipe (Director de Operaciones). Consume `GET /reporting/weekly-location-performance` (y `GET /reporting/pipeline-runs/latest` solo para mostrar cuándo se actualizaron los datos). Muestra el período (lunes a domingo), un resumen por moneda y una sección por KPI con su nombre del BRIEFING, con los locales de mayor a menor. COP y USD se muestran siempre por separado, sin sumarse ni convertirse. Permite ir a la semana anterior o siguiente.
+
+### 7.5 Actividad adicional (mejoras de las preguntas de diseño)
+
+**No se añadió ninguna mejora nueva.** Las que señalaron las respuestas del anexo B ya se implementaron en la Parte 2:
+
+- latido de captura y locales en silencio (preguntas 4 y 6);
+- bloqueo de concurrencia con el índice parcial único (pregunta 10);
+- idempotencia por `eventId` en la ingesta y upsert en la carga (preguntas 1, 2 y 9).
+
+La pregunta 9 concluyó que una cabecera `Idempotency-Key` no hace falta porque la clave viaja en cada evento. Por eso no se construyó una mejora solo para marcar la casilla. Queda como siguiente candidata, sin implementar, la alerta activa del riesgo 3 (notificar cuando la conciliación detecta pérdida de eventos): hoy solo se registra en `details` y deja la corrida en `completed_with_warnings`.

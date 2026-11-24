@@ -136,20 +136,45 @@ def prepare_events(events: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]:
     return frame, stats
 
 
-def transform_weekly_metrics(
-    events: pd.DataFrame,
-    location_dim: pd.DataFrame,
-    window_start: date,
-    window_end: date,
-) -> TransformResult:
-    """One row per location and ISO week with the five business KPIs."""
-    facts, stats = prepare_events(events)
+GROUP_KEYS = ["location_id", "week_start"]
+KPI_FACT_COLUMNS = ["location_id", "week_start", "event_type", "cost"]
 
+
+def _dimension(location_dim: pd.DataFrame) -> pd.DataFrame:
+    missing = {"location_id", "country", "currency"} - set(location_dim.columns)
+    if missing:
+        raise ValueError(f"location_dim no tiene las columnas {sorted(missing)}.")
     dim = location_dim[["location_id", "country", "currency"]].copy()
     dim["location_id"] = dim["location_id"].astype("string")
-    dim_currency = dim.set_index("location_id")["currency"]
+    return dim
 
-    # Currencies are never mixed: unknown locations and currency mismatches are set aside.
+
+def _require_kpi_facts(facts: pd.DataFrame) -> None:
+    """Defensive check shared by the KPI functions: fail loudly on a malformed input."""
+    if not isinstance(facts, pd.DataFrame):
+        raise TypeError(
+            f"Se esperaba un DataFrame de hechos de KPI, no {type(facts).__name__}."
+        )
+    missing = set(KPI_FACT_COLUMNS) - set(facts.columns)
+    if missing:
+        raise ValueError(f"A los hechos de KPI les faltan las columnas {sorted(missing)}.")
+
+
+def prepare_kpi_facts(
+    events: pd.DataFrame,
+    location_dim: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Clean events, set aside the ones that cannot be reported and price each movement.
+
+    Currencies are never mixed: events of unknown locations, or whose currency is
+    not the location's currency, are rejected and counted. The cost of a movement
+    is quantity × unit_cost; a cost event whose cost is unknown (null or
+    non-numeric quantity or unit_cost) gets cost NaN and is counted in
+    events_without_cost, so it never inflates a KPI.
+    """
+    facts, stats = prepare_events(events)
+    dim_currency = _dimension(location_dim).set_index("location_id")["currency"]
+
     known = facts["location_id"].isin(dim_currency.index)
     mismatch = known & facts["currency"].ne(facts["location_id"].map(dim_currency))
     stats["rejected_unknown_location"] = int((~known).sum())
@@ -164,51 +189,118 @@ def transform_weekly_metrics(
     )
     facts["cost"] = (facts["quantity"] * facts["unit_cost"]).where(is_cost_event)
     stats["events_without_cost"] = int((is_cost_event & facts["cost"].isna()).sum())
-    facts["purchase_cost"] = (
-        facts["cost"].where(facts["event_type"].eq("inbound_order_created"), 0).fillna(0)
-    )
-    facts["waste_cost"] = (
-        facts["cost"].where(facts["event_type"].eq("stock_waste_registered"), 0).fillna(0)
-    )
-    facts["is_stockout"] = facts["event_type"].eq("stock_threshold_triggered")
-    facts["is_price_alert"] = facts["event_type"].eq("ingredient_price_variance_detected")
     stats["events_used"] = int(len(facts))
     stats["events_by_type"] = {
         str(name): int(count) for name, count in facts["event_type"].value_counts().items()
     }
+    stats["locations_with_events"] = int(facts["location_id"].nunique())
+    return facts, stats
 
-    weekly = facts.groupby(["location_id", "week_start"], as_index=False).agg(
-        total_purchase_cost=("purchase_cost", "sum"),
-        total_waste_cost=("waste_cost", "sum"),
-        stockout_events_count=("is_stockout", "sum"),
-        price_alert_events_count=("is_price_alert", "sum"),
+
+def _sum_cost(facts: pd.DataFrame, event_type: str, column: str) -> pd.DataFrame:
+    _require_kpi_facts(facts)
+    rows = facts.loc[facts["event_type"].eq(event_type), GROUP_KEYS + ["cost"]]
+    rows = rows.assign(cost=pd.to_numeric(rows["cost"], errors="coerce").fillna(0))
+    return (
+        rows.groupby(GROUP_KEYS, as_index=False)["cost"]
+        .sum()
+        .rename(columns={"cost": column})
     )
-    weekly["location_id"] = weekly["location_id"].astype("string")
 
-    # Every known location gets a row for every week, so "no activity" is an explicit zero.
+
+def _count_events(facts: pd.DataFrame, event_type: str, column: str) -> pd.DataFrame:
+    _require_kpi_facts(facts)
+    rows = facts.loc[facts["event_type"].eq(event_type), GROUP_KEYS]
+    return rows.groupby(GROUP_KEYS, as_index=False).size().rename(columns={"size": column})
+
+
+def calculate_purchase_cost(facts: pd.DataFrame) -> pd.DataFrame:
+    """KPI "Costo de compra por local": sum of quantity × unit_cost of inbound_order_created."""
+    return _sum_cost(facts, "inbound_order_created", "total_purchase_cost")
+
+
+def calculate_waste_cost(facts: pd.DataFrame) -> pd.DataFrame:
+    """KPI "Costo de merma por local": sum of quantity × unit_cost of stock_waste_registered."""
+    return _sum_cost(facts, "stock_waste_registered", "total_waste_cost")
+
+
+def count_stockout_events(facts: pd.DataFrame) -> pd.DataFrame:
+    """KPI "Frecuencia de quiebre de stock": count of stock_threshold_triggered."""
+    return _count_events(facts, "stock_threshold_triggered", "stockout_events_count")
+
+
+def count_price_alert_events(facts: pd.DataFrame) -> pd.DataFrame:
+    """KPI "Frecuencia de alertas de precio": count of ingredient_price_variance_detected."""
+    return _count_events(
+        facts, "ingredient_price_variance_detected", "price_alert_events_count"
+    )
+
+
+def calculate_waste_ratio(
+    total_purchase_cost: pd.Series,
+    total_waste_cost: pd.Series,
+) -> pd.Series:
+    """KPI "Ratio de merma": total_waste_cost / total_purchase_cost, 0 without purchases.
+
+    A week without purchases (0, negative or unknown purchase cost) has ratio 0,
+    never infinity or NaN, as the BRIEFING defines.
+    """
+    purchase = pd.to_numeric(total_purchase_cost, errors="coerce")
+    waste = pd.to_numeric(total_waste_cost, errors="coerce").fillna(0)
+    ratio = waste / purchase.where(purchase > 0)
+    return ratio.fillna(0).round(4)
+
+
+def assemble_weekly_location_performance(
+    location_dim: pd.DataFrame,
+    window_start: date,
+    window_end: date,
+    purchase_cost: pd.DataFrame,
+    waste_cost: pd.DataFrame,
+    stockout_events: pd.DataFrame,
+    price_alert_events: pd.DataFrame,
+) -> pd.DataFrame:
+    """One row per known location and ISO week; "no activity" is an explicit zero."""
+    dim = _dimension(location_dim)
     weeks = pd.DataFrame({"week_start": week_starts(window_start, window_end)})
-    grid = dim.merge(weeks, how="cross")
-    result = grid.merge(weekly, on=["location_id", "week_start"], how="left")
-    for column in (
-        "total_purchase_cost",
-        "total_waste_cost",
-        "stockout_events_count",
-        "price_alert_events_count",
-    ):
-        result[column] = result[column].fillna(0)
-    result["total_purchase_cost"] = result["total_purchase_cost"].round(2)
-    result["total_waste_cost"] = result["total_waste_cost"].round(2)
-    result["stockout_events_count"] = result["stockout_events_count"].astype(int)
-    result["price_alert_events_count"] = result["price_alert_events_count"].astype(int)
-    ratio = result["total_waste_cost"] / result["total_purchase_cost"].where(
-        result["total_purchase_cost"] > 0
+    result = dim.merge(weeks, how="cross")
+    for kpi in (purchase_cost, waste_cost, stockout_events, price_alert_events):
+        kpi = kpi.assign(location_id=kpi["location_id"].astype("string"))
+        result = result.merge(kpi, on=GROUP_KEYS, how="left")
+    for column in ("total_purchase_cost", "total_waste_cost"):
+        result[column] = result[column].fillna(0).astype(float).round(2)
+    for column in ("stockout_events_count", "price_alert_events_count"):
+        result[column] = result[column].fillna(0).astype(int)
+    result["waste_ratio"] = calculate_waste_ratio(
+        result["total_purchase_cost"], result["total_waste_cost"]
     )
-    result["waste_ratio"] = ratio.fillna(0).round(4)
-
     result["_order"] = result["location_id"].astype(int)
     result = result.sort_values(["week_start", "_order"]).reset_index(drop=True)
-    stats["locations_with_events"] = int(facts["location_id"].nunique())
-    return TransformResult(weekly=result[OUTPUT_COLUMNS], stats=stats)
+    return result[OUTPUT_COLUMNS]
+
+
+def transform_weekly_metrics(
+    events: pd.DataFrame,
+    location_dim: pd.DataFrame,
+    window_start: date,
+    window_end: date,
+) -> TransformResult:
+    """One row per location and ISO week with the five business KPIs.
+
+    The same composition that the Prefect subflow transform_weekly_location_kpis
+    runs task by task; kept as a single pure function for direct use.
+    """
+    facts, stats = prepare_kpi_facts(events, location_dim)
+    weekly = assemble_weekly_location_performance(
+        location_dim,
+        window_start,
+        window_end,
+        calculate_purchase_cost(facts),
+        calculate_waste_cost(facts),
+        count_stockout_events(facts),
+        count_price_alert_events(facts),
+    )
+    return TransformResult(weekly=weekly, stats=stats)
 
 
 def find_silent_locations(
