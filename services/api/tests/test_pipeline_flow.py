@@ -172,13 +172,13 @@ class PipelineFlowTests(unittest.TestCase):
         calls = []
         from data.process import weekly_location_performance as process
 
-        original = process.transform_weekly_metrics
+        original = process.prepare_kpi_facts
 
         def counted(*args, **kwargs):
             calls.append(1)
             return original(*args, **kwargs)
 
-        with patch.object(process, "transform_weekly_metrics", side_effect=counted):
+        with patch.object(process, "prepare_kpi_facts", side_effect=counted):
             with patch.object(
                 queries,
                 "read_domain_rows",
@@ -370,6 +370,26 @@ class PipelineFlowTests(unittest.TestCase):
             self._run()
         self.assertEqual(self._latest_run()["status"], "failed")
         self.assertEqual(self._latest_run()["phase"], "extract")
+
+    def test_each_subflow_runs_on_its_own_with_explicit_inputs(self):
+        sources = pipeline.extract_weekly_location_sources(WINDOW_START, WINDOW_END)
+        self.assertEqual(len(sources["events"]), 2)
+        self.assertEqual(sources["source_total_events"], 2)
+        self.assertEqual(len(sources["location_dim"]), 4)
+
+        transformed = pipeline.transform_weekly_location_kpis(
+            sources["events"], sources["location_dim"], WINDOW_START, WINDOW_END
+        )
+        weekly = transformed["weekly"]
+        self.assertEqual(len(weekly), 16)  # 4 locations × 4 ISO weeks
+        local_week = weekly[(weekly["location_id"] == "1") & (weekly["week_start"] == date(2026, 11, 16))]
+        self.assertEqual(local_week["waste_ratio"].iloc[0], 0.25)
+        self.assertEqual(self._published_rows(), [])  # transforming never writes
+
+        loaded = pipeline.publish_weekly_location_performance(weekly, WINDOW_START, WINDOW_END)
+        self.assertEqual(loaded["rows_inserted"], 16)
+        self.assertEqual(len(self._published_rows()), 16)
+        self.assertIsNone(self._latest_run())  # no run log: the main flow owns it
 
     def test_data_sources_are_unchanged_by_pipeline_writes(self):
         before = self._telemetry_snapshot()

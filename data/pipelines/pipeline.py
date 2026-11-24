@@ -6,6 +6,16 @@ Costo y Merma por Local" read by Mariana (CEO) and Felipe (Director of
 Operations). It reads telemetry_events (read only) and writes only to
 reporting.weekly_location_performance and reporting.pipeline_runs.
 
+Topology (Part 3): the main flow weekly_location_performance_flow only
+coordinates the run log and calls one subflow per phase, each with explicit
+inputs and outputs:
+
+    extract_weekly_location_sources        extraction: telemetry_events + location_dim
+    check_weekly_source_health             optional (return_state=True): quality checks
+    transform_weekly_location_kpis         transformation: one task per business KPI
+    publish_weekly_location_performance    load: idempotent upsert
+    export_weekly_eval_snapshot            optional (return_state=True): data/eval snapshot
+
 Run it from the command line (repository root):
 
     uv run python data/pipelines/pipeline.py                     # recompute the last 4 weeks
@@ -33,6 +43,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 import pandas as pd  # noqa: E402
 from prefect import flow, get_run_logger, task  # noqa: E402
+from prefect.cache_policies import NO_CACHE  # noqa: E402
 from prefect.exceptions import MissingContextError  # noqa: E402
 from prefect.runtime import flow_run  # noqa: E402
 
@@ -57,26 +68,24 @@ def _state_message(state: Any) -> str:
     return str(state.message or state.name)[:300]
 
 
-def transform_cache_key(context: Any, parameters: dict[str, Any]) -> str:
-    """Cache key of transform_weekly_metrics.
+def kpi_facts_cache_key(context: Any, parameters: dict[str, Any]) -> str:
+    """Cache key of prepare_kpi_facts.
 
-    It is built from the window plus a hash of the event ids and of location_dim.
-    Telemetry events are immutable, so the same ids always give the same weekly
-    result. The entry is valid for one hour (cache_expiration): a second run
-    within the hour reuses the result instead of recomputing it, and any new
-    event or change in location_dim changes the key.
+    It is a hash of the event ids and of location_dim. Telemetry events are
+    immutable, so the same ids always give the same facts. The entry is valid
+    for one hour (cache_expiration): a second run within the hour reuses the
+    result instead of recomputing it, and any new event or change in
+    location_dim changes the key.
     """
     digest = hashlib.sha256()
-    digest.update(str(parameters["window_start"]).encode())
-    digest.update(str(parameters["window_end"]).encode())
     ids = parameters["events"]["id"].astype(str).sort_values()
     digest.update(pd.util.hash_pandas_object(ids, index=False).to_numpy().tobytes())
     dim = parameters["location_dim"].astype(str)
     digest.update(pd.util.hash_pandas_object(dim, index=False).to_numpy().tobytes())
-    return f"weekly-location-performance-transform:{digest.hexdigest()}"
+    return f"weekly-location-kpi-facts:{digest.hexdigest()}"
 
 
-# ---------------------------------------------------------------- tasks
+# ------------------------------------------------------- run-log tasks
 
 # open_run touches the database. 2 retries: a transient failure is absorbed, but a
 # lock conflict is not an error (it is returned as locked=True).
@@ -101,6 +110,14 @@ def open_run_step(
     return {"run_id": opened, "locked": False}
 
 
+# Closing the run is what releases the lock: 3 retries.
+@task(name="close_run", retries=3, retry_delay_seconds=[5, 15, 45])
+def close_run_step(**kwargs: Any) -> None:
+    runs.close_run(**kwargs)
+
+
+# ---------------------------------------------------- extraction tasks
+
 # Database reads. 3 retries with growing waits (10, 30 and 90 s): enough to ride out a
 # Supabase restart or a pooler hiccup (about 2 minutes) without hiding a real outage.
 @task(name="extract_telemetry_events", retries=3, retry_delay_seconds=[10, 30, 90])
@@ -119,8 +136,7 @@ def extract_location_dim() -> pd.DataFrame:
     return location_dim
 
 
-# OPTIONAL step (called with return_state=True): if the quality checks fail the run
-# continues and finishes as completed_with_warnings. 2 retries: reads only.
+# 2 retries: reads only. Its subflow is optional (called with return_state=True).
 @task(name="check_source_health", retries=2, retry_delay_seconds=[10, 30])
 def check_source_health(
     events: pd.DataFrame,
@@ -137,23 +153,80 @@ def check_source_health(
     }
 
 
-# Expensive Pandas transformation: cached for one hour (see transform_cache_key).
-# It is a pure function, so it is not retried: a failure is a logic or data error.
+# ------------------------------------------------ transformation tasks
+#
+# Pure Pandas functions from data/process, so they are not retried: a failure is a
+# logic or data error and retrying does not fix it. Only the expensive preparation
+# (deduplication, parsing of tags, rejections, cost of each movement) is cached;
+# the KPI tasks are cheap aggregations and are never cached.
+
 @task(
-    name="transform_weekly_metrics",
-    cache_key_fn=transform_cache_key,
+    name="prepare_kpi_facts",
+    cache_key_fn=kpi_facts_cache_key,
     cache_expiration=timedelta(hours=1),
     persist_result=True,
 )
-def transform_weekly_metrics(
+def prepare_kpi_facts(
     events: pd.DataFrame,
+    location_dim: pd.DataFrame,
+) -> dict[str, Any]:
+    facts, stats = process.prepare_kpi_facts(events, location_dim)
+    return {"facts": facts, "stats": stats}
+
+
+@task(name="calculate_purchase_cost_per_location", cache_policy=NO_CACHE)
+def calculate_purchase_cost_per_location(facts: pd.DataFrame) -> pd.DataFrame:
+    """KPI "Costo de compra por local" (total_purchase_cost)."""
+    return process.calculate_purchase_cost(facts)
+
+
+@task(name="calculate_waste_cost_per_location", cache_policy=NO_CACHE)
+def calculate_waste_cost_per_location(facts: pd.DataFrame) -> pd.DataFrame:
+    """KPI "Costo de merma por local" (total_waste_cost)."""
+    return process.calculate_waste_cost(facts)
+
+
+@task(name="count_stockout_events_per_location", cache_policy=NO_CACHE)
+def count_stockout_events_per_location(facts: pd.DataFrame) -> pd.DataFrame:
+    """KPI "Frecuencia de quiebre de stock" (stockout_events_count)."""
+    return process.count_stockout_events(facts)
+
+
+@task(name="count_price_alert_events_per_location", cache_policy=NO_CACHE)
+def count_price_alert_events_per_location(facts: pd.DataFrame) -> pd.DataFrame:
+    """KPI "Frecuencia de alertas de precio" (price_alert_events_count)."""
+    return process.count_price_alert_events(facts)
+
+
+@task(name="calculate_waste_ratio_per_location", cache_policy=NO_CACHE)
+def calculate_waste_ratio_per_location(
     location_dim: pd.DataFrame,
     window_start: date,
     window_end: date,
-) -> dict[str, Any]:
-    result = process.transform_weekly_metrics(events, location_dim, window_start, window_end)
-    return {"weekly": result.weekly, "stats": result.stats}
+    purchase_cost: pd.DataFrame,
+    waste_cost: pd.DataFrame,
+    stockout_events: pd.DataFrame,
+    price_alert_events: pd.DataFrame,
+) -> pd.DataFrame:
+    """KPI "Ratio de merma" (waste_ratio) on the complete location × week grid.
 
+    It joins the four KPIs above onto every known location and week (no activity
+    is an explicit zero) and derives waste_ratio = total_waste_cost /
+    total_purchase_cost (0 without purchases). The output has the columns of
+    reporting.weekly_location_performance.
+    """
+    return process.assemble_weekly_location_performance(
+        location_dim,
+        window_start,
+        window_end,
+        purchase_cost,
+        waste_cost,
+        stockout_events,
+        price_alert_events,
+    )
+
+
+# ----------------------------------------------------------- load tasks
 
 # The load is one transaction with an upsert, so repeating it is safe: 3 retries.
 @task(name="load_weekly_location_performance", retries=3, retry_delay_seconds=[10, 30, 90])
@@ -165,7 +238,7 @@ def load_weekly_location_performance(
     return queries.load_weekly(db.get_engine(), weekly, window_start, window_end)
 
 
-# OPTIONAL, non-critical step: a snapshot of the result for validation in data/eval/.
+# Non-critical: a snapshot of the result for validation in data/eval/.
 @task(name="export_eval_snapshot")
 def export_eval_snapshot(weekly: pd.DataFrame, run_id: str) -> str:
     EVAL_DIR.mkdir(parents=True, exist_ok=True)
@@ -177,13 +250,91 @@ def export_eval_snapshot(weekly: pd.DataFrame, run_id: str) -> str:
     return str(path)
 
 
-# Closing the run is what releases the lock: 3 retries.
-@task(name="close_run", retries=3, retry_delay_seconds=[5, 15, 45])
-def close_run_step(**kwargs: Any) -> None:
-    runs.close_run(**kwargs)
+# ------------------------------------------------------------- subflows
+#
+# Each subflow receives everything it needs as parameters and returns its result:
+# nothing is shared through globals, so each one can be run on its own, e.g.
+#     extract_weekly_location_sources(date(2026, 11, 9), date(2026, 11, 23))
+
+@flow(name="extract-weekly-location-sources")
+def extract_weekly_location_sources(
+    window_start: date,
+    window_end: date,
+) -> dict[str, Any]:
+    """Extraction: KPI events of the window (read only) and the location dimension.
+
+    Returns {"events": DataFrame, "location_dim": DataFrame,
+    "source_total_events": int}. source_total_events counts events of ANY type
+    in the window: it is the capture heartbeat.
+    """
+    extraction = extract_telemetry_events(window_start, window_end)
+    location_dim = extract_location_dim()
+    return {
+        "events": extraction["events"],
+        "location_dim": location_dim,
+        "source_total_events": int(extraction["source_total_events"]),
+    }
 
 
-# ----------------------------------------------------------------- flow
+@flow(name="check-weekly-source-health")
+def check_weekly_source_health(
+    events: pd.DataFrame,
+    window_start: date,
+    window_end: date,
+) -> dict[str, Any]:
+    """Optional quality checks: silent locations and reconciliation with the domain tables.
+
+    Returns {"silent_locations": [...], "reconciliation": [...]}.
+    """
+    return check_source_health(events, window_start, window_end)
+
+
+@flow(name="transform-weekly-location-kpis")
+def transform_weekly_location_kpis(
+    events: pd.DataFrame,
+    location_dim: pd.DataFrame,
+    window_start: date,
+    window_end: date,
+) -> dict[str, Any]:
+    """Transformation: the five KPIs of the BRIEFING, one task each.
+
+    Returns {"weekly": DataFrame with the columns of
+    reporting.weekly_location_performance, "stats": quality counters}.
+    """
+    prepared = prepare_kpi_facts(events, location_dim)
+    facts = prepared["facts"]
+    weekly = calculate_waste_ratio_per_location(
+        location_dim,
+        window_start,
+        window_end,
+        calculate_purchase_cost_per_location(facts),
+        calculate_waste_cost_per_location(facts),
+        count_stockout_events_per_location(facts),
+        count_price_alert_events_per_location(facts),
+    )
+    return {"weekly": weekly, "stats": prepared["stats"]}
+
+
+@flow(name="publish-weekly-location-performance")
+def publish_weekly_location_performance(
+    weekly: pd.DataFrame,
+    window_start: date,
+    window_end: date,
+) -> dict[str, Any]:
+    """Load: idempotent upsert into reporting.weekly_location_performance.
+
+    Returns {"rows_inserted", "rows_updated", "rows_unchanged", "weeks_revised"}.
+    """
+    return load_weekly_location_performance(weekly, window_start, window_end)
+
+
+@flow(name="export-weekly-eval-snapshot")
+def export_weekly_eval_snapshot(weekly: pd.DataFrame, run_id: str) -> str:
+    """Optional: writes the published rows to data/eval/ and returns the file path."""
+    return export_eval_snapshot(weekly, run_id)
+
+
+# ------------------------------------------------------------ main flow
 
 @flow(name="weekly-location-performance")
 def weekly_location_performance_flow(
@@ -192,7 +343,11 @@ def weekly_location_performance_flow(
     trigger_type: str = "schedule",
     run_id: str | None = None,
 ) -> dict[str, Any]:
-    """Recompute the last `lookback_weeks` ISO weeks and upsert them."""
+    """Recompute the last `lookback_weeks` ISO weeks and upsert them.
+
+    It holds no ETL logic: it opens and closes the run (lock, phase checkpoint)
+    and calls the subflows in sequence.
+    """
     logger = _logger()
     window_start, window_end = process.compute_window(reference_date, lookback_weeks)
 
@@ -217,14 +372,15 @@ def weekly_location_performance_flow(
     try:
         phase = "extract"
         runs.set_phase(run_id, phase)
-        extraction = extract_telemetry_events(window_start, window_end)
-        location_dim = extract_location_dim()
-        events = extraction["events"]
-        source_total = extraction["source_total_events"]
+        sources = extract_weekly_location_sources(window_start, window_end)
+        events = sources["events"]
+        source_total = sources["source_total_events"]
         details["source_total_events"] = source_total
 
-        # Optional step: a failure is recorded and the run continues.
-        health = check_source_health(events, window_start, window_end, return_state=True)
+        # Optional subflow: a failure is recorded and the run continues.
+        health = check_weekly_source_health(
+            events, window_start, window_end, return_state=True
+        )
         if health.is_completed():
             details["health"] = health.result()
             if details["health"]["silent_locations"] or details["health"]["reconciliation"]:
@@ -241,8 +397,8 @@ def weekly_location_performance_flow(
         else:
             phase = "transform"
             runs.set_phase(run_id, phase)
-            transformed = transform_weekly_metrics(
-                events, location_dim, window_start, window_end
+            transformed = transform_weekly_location_kpis(
+                events, sources["location_dim"], window_start, window_end
             )
             stats = transformed["stats"]
             details["transform"] = stats
@@ -253,12 +409,15 @@ def weekly_location_performance_flow(
 
             phase = "load"
             runs.set_phase(run_id, phase)
-            loaded = load_weekly_location_performance(
+            loaded = publish_weekly_location_performance(
                 transformed["weekly"], window_start, window_end
             )
             details["weeks_revised"] = loaded["weeks_revised"]
 
-            snapshot = export_eval_snapshot(transformed["weekly"], run_id, return_state=True)
+            # Optional subflow: a failure is recorded and the run continues.
+            snapshot = export_weekly_eval_snapshot(
+                transformed["weekly"], run_id, return_state=True
+            )
             if snapshot.is_completed():
                 details["snapshot"] = snapshot.result()
             else:
