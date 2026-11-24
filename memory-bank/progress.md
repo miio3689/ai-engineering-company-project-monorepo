@@ -437,3 +437,27 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   - Contra Supabase, `python data/pipelines/pipeline.py` terminó con exit 0, los cinco subflows completados y las 56 filas sin cambios (idempotente).
   - Revisión visual de `/reporting` con datos reales, en escritorio y en móvil.
 - Pendiente: sigue habiendo poca telemetría con coste, así que casi todos los KPIs valen 0 hasta que haya movimientos de inventario reales.
+
+
+## Procesos en Segundo Plano (ticket DEV-53)
+
+- `scripts/nightly_export.py`:
+  - Para el día objetivo (ayer en UTC, o `TARGET_DATE`), exporta `telemetry_events` a `data/raw/telemetry_YYYY-MM-DD.csv` solo si no existe. El CSV es una copia de respaldo; los CSV quedan fuera de git.
+  - Después lanza `data/pipelines/pipeline.py` como subproceso.
+  - Es un proceso independiente de FastAPI.
+- `services/job_runner/`:
+  - Gestiona la máquina de estados `pending` → `processing` → `completed` | `failed` en `public.job_runs` (SQL en `services/job_runner/sql/job_runs.sql`, índice en `(job_name, target_date)`).
+  - `processing` es el lock. El índice único parcial `ux_job_runs_one_processing` lo hace atómico.
+  - La idempotencia es por `(job_name, target_date)`. Las omisiones quedan como `completed` con `skip_reason`.
+  - `try/except/finally` garantiza que ninguna fila quede en `processing`, y las abandonadas durante más de 2 h se cierran como `failed`.
+  - `job_runs` no sustituye a `reporting.pipeline_runs`: el subproceso del pipeline sigue registrando allí sus fases.
+- Disparador: contenedor `scheduler` dedicado (`scripts/scheduler/`) con cron `0 2 * * *` en UTC. No usa el proceso de la API.
+- Validado el 2026-11-24:
+  - 17 tests en `tests/jobs/test_nightly_export.py`.
+  - La tabla `job_runs` está creada en Supabase.
+  - Pruebas reales:
+    - El 19/11 exportó 19 filas y completó; la segunda ejecución se omitió como `duplicate`.
+    - Dos instancias simultáneas del 18/11: una completó y la otra se omitió como `locked`.
+    - Un timeout forzado del pipeline (17/11) quedó en `failed`, y el reintento completó.
+    - Al final no quedó ninguna fila en `processing`.
+- Pendiente: la imagen del contenedor `scheduler` no se pudo construir en local (no hay Docker en el equipo). Hay que validarla en el VPS con `docker compose up -d --build scheduler`.
