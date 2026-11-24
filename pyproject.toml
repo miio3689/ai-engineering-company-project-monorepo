@@ -24,7 +24,10 @@ dependencies = [
 ]
 
 [dependency-groups]
-test = ["httpx>=0.28,<1.0"]
+test = [
+    "httpx>=0.28,<1.0",
+    "pytest>=8",
+]
 
 [project.scripts]
 seed = "services.api.seed:main"
