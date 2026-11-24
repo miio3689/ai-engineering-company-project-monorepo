@@ -75,6 +75,27 @@ services:
     networks:
       - brasaland
 
+  # Nightly jobs (ticket DEV-53): cron in its own container, never in the API
+  # process. Schedule in scripts/scheduler/crontab (02:00 UTC every day).
+  scheduler:
+    build:
+      context: ./scripts
+      dockerfile: scheduler/Dockerfile
+      additional_contexts:
+        services: ./services
+        data: ./data
+    env_file:
+      - path: ${API_ENV_FILE:-./.env}
+        required: false
+    environment:
+      TZ: UTC
+    volumes:
+      # The CSV backups and the pipeline snapshots stay on the host.
+      - ./data/raw:/app/data/raw
+      - ./data/eval:/app/data/eval
+    networks:
+      - brasaland
+
 networks:
   brasaland:
     name: brasaland
