@@ -17,3 +17,7 @@ services/api/.loadtest/
 # Salidas del pipeline de reporting
 data/eval/*.json
 data/eval/*.log
+
+# Copias nocturnas de telemetry_events (pueden contener ids de usuario y sesión)
+data/raw/telemetry_*.csv
+data/raw/*.csv.partial
