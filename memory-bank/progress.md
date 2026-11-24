@@ -421,3 +421,19 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   KPIs valen 0. Hay que generar movimientos de inventario antes del dashboard de
   la Parte 3. Las cifras de inventario de la semana del 2026-11-02 no emitieron
   eventos (detectado por `check_source_health`).
+
+
+## Mejora del Pipeline: Subflows y Tests (Parte 3 de 3)
+
+- El flow principal de `data/pipelines/pipeline.py` coordina cinco subflows: `extract_weekly_location_sources`, `check_weekly_source_health` (opcional), `transform_weekly_location_kpis`, `publish_weekly_location_performance` y `export_weekly_eval_snapshot` (opcional). Los opcionales se invocan con `return_state=True`.
+- La transformación tiene una task por KPI del BRIEFING. La caché de 1 hora pasa a `prepare_kpi_facts`.
+- Tests unitarios aislados en `tests/pipelines/test_pipeline.py` (15). pytest se añadió al grupo `test` de `pyproject.toml`.
+- Dashboard `/reporting` en `uis/backoffice/` (enlace "Reporte semanal"), alimentado por `GET /reporting/weekly-location-performance`, con test `npm run test:reporting`.
+- `telemetry_events` y `services/telemetry/analysis.py` no se modificaron. El detalle está en la sección 7 de `data/pipelines/PIPELINE_DESIGN.md`.
+- Validado el 2026-11-24:
+  - `python -m pytest tests/pipelines/test_pipeline.py`: 15 tests pasan.
+  - Suite de `services/api/tests`: 232 de 233 pasan, incluido un nuevo test que ejecuta cada subflow por separado. El que falla es `test_analyzer_runs_as_script_with_synthetic_csv`, que ya fallaba en `main` por la codificación cp1252 de la consola de Windows (Hito 1, fuera de alcance).
+  - Backoffice: `typecheck`, `build` y `test:reporting` (9) pasan.
+  - Contra Supabase, `python data/pipelines/pipeline.py` terminó con exit 0, los cinco subflows completados y las 56 filas sin cambios (idempotente).
+  - Revisión visual de `/reporting` con datos reales, en escritorio y en móvil.
+- Pendiente: sigue habiendo poca telemetría con coste, así que casi todos los KPIs valen 0 hasta que haya movimientos de inventario reales.
