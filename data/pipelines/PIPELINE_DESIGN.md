@@ -597,3 +597,18 @@ Página `/reporting` del backoffice ("Reporte semanal" en la navegación), para 
 - idempotencia por `eventId` en la ingesta y upsert en la carga (preguntas 1, 2 y 9).
 
 La pregunta 9 concluyó que una cabecera `Idempotency-Key` no hace falta porque la clave viaja en cada evento. Por eso no se construyó una mejora solo para marcar la casilla. Queda como siguiente candidata, sin implementar, la alerta activa del riesgo 3 (notificar cuando la conciliación detecta pérdida de eventos): hoy solo se registra en `details` y deja la corrida en `completed_with_warnings`.
+
+
+## 8. Disparo manual asíncrono con Celery (ticket DEV-55)
+
+Desde DEV-55, `POST /reporting/pipeline-runs` ya no abre la corrida ni lanza un proceso desde la API: encola la tarea de Celery `reporting.run_weekly_location_performance` y responde `202` con `{"task_id", "status": "queued", "status_url"}`. El mensaje solo lleva `reference_date` y `lookback_weeks`.
+
+El worker (`services/async_tasks/pipeline_tasks.py`) se ocupa de lo demás:
+
+- Abre la corrida en `reporting.pipeline_runs`, que sigue siendo el bloqueo y el registro de fases.
+- Ejecuta `pipeline.py --run-id ...` como subproceso.
+- Si otra corrida está activa, la tarea termina con `skipped_locked`. Esto sustituye al antiguo `409`.
+- Si el proceso falla o se agota su tiempo, cierra la corrida como `failed` (`runs.fail_run_if_running`) y reintenta con backoff exponencial.
+- Tras 3 reintentos, la tarea pasa a `public.task_dead_letters`.
+
+El resultado de la tarea (`GET /tasks/{task_id}`) incluye el `run_id` y los recuentos de la corrida. Esto sustituye la sección 5.2: `runs.trigger_run` y `launch_flow_process` se eliminaron.

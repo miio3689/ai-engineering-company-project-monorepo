@@ -461,3 +461,30 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
     - Un timeout forzado del pipeline (17/11) quedó en `failed`, y el reintento completó.
     - Al final no quedó ninguna fila en `processing`.
 - Pendiente: la imagen del contenedor `scheduler` no se pudo construir en local (no hay Docker en el equipo). Hay que validarla en el VPS con `docker compose up -d --build scheduler`.
+
+
+## Colas de Mensajes y Tareas Asíncronas (ticket DEV-55)
+
+- `docker-compose.yml` incluye:
+  - `redis` (`redis:7.4-alpine`, puerto 6379, `--maxmemory-policy noeviction`, AOF);
+  - `worker` (`celery -A services.celery_app worker`);
+  - `flower` (puerto 5555).
+- La API y el worker leen `REDIS_URL`. La imagen de `services/` ahora copia `data/pipelines` y `data/process`, porque la API ya los importaba y el worker los ejecuta.
+- `services/celery_app.py`: Redis como broker y como backend, JSON, `acks_late`, `track_started` y límites de tiempo.
+- `services/async_tasks/`:
+  - La tarea `reporting.run_weekly_location_performance`.
+  - La clase base `TrackedTask`: logs con `task_id`, intento, estado y duración; 3 reintentos con backoff de 10, 20 y 40 s; DLQ en `public.task_dead_letters`.
+- `POST /reporting/pipeline-runs` encola y responde `202` con `task_id`. `GET /tasks/{task_id}` devuelve `pending`, `started`, `retry`, `success` o `failure` y el resultado.
+- Validado el 2026-11-25:
+  - 20 tests en `tests/tasks/test_async_tasks.py` y las 232 pruebas de la API pasan.
+  - Prueba real con la API, el worker y Flower como procesos separados, usando un Redis simulado (fakeredis) y Supabase:
+    - El `POST` responde en 2-29 ms en caliente (363 ms la primera vez).
+    - Se vieron los estados `pending → started → success`.
+    - Con la API detenida, el worker terminó las 5 tareas en cola sin perder ninguna.
+    - Una tarea forzada a fallar hizo 4 intentos con esperas de 5, 10 y 20 s y quedó en la DLQ con `attempt=4`.
+- Validado en Docker el 2026-11-25 (Docker Desktop con WSL2): `redis` (con `noeviction`), `worker` y `flower` levantados con `docker compose`.
+  - Una tarea completó con el pipeline ejecutándose en el contenedor.
+  - Otra, forzada con un timeout de 1 s, hizo 4 intentos con esperas de 5, 10 y 20 s y llegó a la DLQ de Supabase.
+  - Flower muestra las dos tareas, SUCCESS y FAILURE.
+  - Hubo que añadir `PYTHONPATH=/app` a la imagen, porque Celery solo añade la carpeta de trabajo al `sys.path` mientras carga la app.
+- Pendiente: crear `public.task_dead_letters` en otros entornos (ya existe en Supabase).
