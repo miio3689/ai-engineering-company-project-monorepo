@@ -168,31 +168,33 @@ class ReportingEndpointTests(unittest.TestCase):
         self.assertEqual(payload["rows_extracted"], 12)
         self.assertEqual(payload["details"], {"checks": "ok"})
 
-    def test_manual_trigger_returns_accepted_and_launches_mocked_flow(self):
-        with patch.object(reporting_router.pipeline_runs, "launch_flow_process") as launch:
+    def test_manual_trigger_only_enqueues_and_returns_accepted_with_task_id(self):
+        with patch.object(
+            reporting_router, "enqueue_pipeline_run", return_value="0b7c9a64-1d1f-4f43-9a1e-3c0f4b2a8e11"
+        ) as enqueue:
             response = self.client.post(
                 "/reporting/pipeline-runs",
                 json={"week_start": "2026-11-16", "lookback_weeks": 2},
             )
         self.assertEqual(response.status_code, 202, response.text)
-        payload = response.json()
-        self.assertEqual(payload["status"], "running")
-        launch.assert_called_once()
-        self.assertEqual(launch.call_args.args[0], payload["run_id"])
-        self.assertEqual(launch.call_args.args[1], date(2026, 11, 16))
-        self.assertEqual(launch.call_args.args[2], 2)
-
-    def test_manual_trigger_returns_conflict_if_run_is_active(self):
-        runs.open_run(
-            trigger_type="schedule",
-            window_start=date(2026, 11, 9),
-            window_end=date(2026, 11, 23),
-            engine=self.engine,
+        self.assertEqual(
+            response.json(),
+            {
+                "task_id": "0b7c9a64-1d1f-4f43-9a1e-3c0f4b2a8e11",
+                "status": "queued",
+                "status_url": "/tasks/0b7c9a64-1d1f-4f43-9a1e-3c0f4b2a8e11",
+            },
         )
-        with patch.object(reporting_router.pipeline_runs, "launch_flow_process") as launch:
+        enqueue.assert_called_once_with(date(2026, 11, 16), 2)
+        # The API opens no run: the worker does.
+        self.assertIsNone(runs.get_latest_run(engine=self.engine))
+
+    def test_manual_trigger_returns_503_when_the_queue_is_unreachable(self):
+        with patch.object(
+            reporting_router, "enqueue_pipeline_run", side_effect=ConnectionError("redis down")
+        ):
             response = self.client.post("/reporting/pipeline-runs")
-        self.assertEqual(response.status_code, 409, response.text)
-        launch.assert_not_called()
+        self.assertEqual(response.status_code, 503, response.text)
 
     def test_manual_trigger_validates_request_and_defaults(self):
         for payload in (
@@ -203,11 +205,10 @@ class ReportingEndpointTests(unittest.TestCase):
                 response = self.client.post("/reporting/pipeline-runs", json=payload)
                 self.assertEqual(response.status_code, 422, response.text)
 
-        with patch.object(reporting_router.pipeline_runs, "launch_flow_process") as launch:
+        with patch.object(reporting_router, "enqueue_pipeline_run", return_value="t") as enqueue:
             response = self.client.post("/reporting/pipeline-runs")
         self.assertEqual(response.status_code, 202, response.text)
-        self.assertEqual(launch.call_args.args[1], None)
-        self.assertEqual(launch.call_args.args[2], 4)
+        enqueue.assert_called_once_with(None, 4)
 
     def test_reporting_openapi_exposes_three_operations_and_response_models(self):
         openapi = self.client.get("/openapi.json").json()

@@ -13,6 +13,7 @@ from data.pipelines import queries as pipeline_queries
 from data.pipelines import runs as pipeline_runs
 from services.api.auth_security import get_current_user
 from services.api.models import UserResponse
+from services.async_tasks.pipeline_tasks import enqueue_pipeline_run
 
 from .schemas import (
     PipelineRun,
@@ -77,17 +78,19 @@ def trigger_pipeline_run(
     request: PipelineRunRequest | None = None,
     _current_user: UserResponse = Depends(get_current_user),
 ) -> dict:
-    """Manual run: 202 with the run id, or 409 if another run is active."""
+    """Manual run: enqueue it in Celery and answer 202 with the task id at once.
+
+    The API does no pipeline nor database work here: the Celery worker opens the
+    run (and its lock) and executes the flow. If another run is active the task
+    finishes with status skipped_locked.
+    """
     options = request or PipelineRunRequest()
     try:
-        return pipeline_runs.trigger_run(
-            reference_date=options.week_start,
-            lookback_weeks=options.lookback_weeks,
-        )
-    except pipeline_runs.PipelineLocked as locked:
+        task_id = enqueue_pipeline_run(options.week_start, options.lookback_weeks)
+    except Exception as exc:  # Redis unreachable
+        logger.error("Could not enqueue the pipeline run (type: %s).", type(exc).__name__)
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(locked),
-        ) from locked
-    except (SQLAlchemyError, RuntimeError, OSError) as exc:
-        raise _unavailable(exc) from exc
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="La cola de tareas no está disponible.",
+        ) from exc
+    return {"task_id": task_id, "status": "queued", "status_url": f"/tasks/{task_id}"}
