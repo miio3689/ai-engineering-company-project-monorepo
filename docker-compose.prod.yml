@@ -47,3 +47,14 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  redis:
+    restart: unless-stopped
+
+  worker:
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
