@@ -64,6 +64,39 @@ ai-engineering-company-project-monorepo/
 
 ---
 
+## Tareas asíncronas: Redis, worker de Celery y Flower
+
+`POST /reporting/pipeline-runs` ya no ejecuta el pipeline: lo encola en Redis y responde `202` con un `task_id`. Un worker de Celery, que es un proceso aparte de FastAPI, consume la cola. El estado de una tarea se consulta con `GET /tasks/{task_id}`.
+
+**Levantar** Redis, el worker y Flower con Docker, desde la raíz del repositorio:
+
+```bash
+docker compose up -d --build redis worker flower
+docker compose logs -f worker              # ver el worker
+```
+
+Flower queda en <http://localhost:5555>. La API y el worker leen el broker de `REDIS_URL` (por defecto `redis://redis:6379/0` en Docker y `redis://localhost:6379/0` fuera de Docker).
+
+**Detener** el worker. Termina la tarea en curso (hasta 60 s) y los mensajes que siguen en cola esperan en Redis al siguiente arranque:
+
+```bash
+docker compose stop worker
+```
+
+**Sin Docker** (con Redis accesible en `REDIS_URL`):
+
+```bash
+uv run celery -A services.celery_app worker --loglevel=INFO               # Linux / macOS
+uv run celery -A services.celery_app worker --loglevel=INFO --pool=solo   # Windows
+uv run celery -A services.celery_app flower --port=5555
+```
+
+Se detiene con `Ctrl+C`: una vez para un apagado ordenado y dos para forzarlo.
+
+- **Reintentos**: 3 (`max_retries=3`), con esperas de 10, 20 y 40 s (`TASK_RETRY_BASE_SECONDS`).
+- **Dead Letter Queue**: después del último reintento, la tarea se registra en `public.task_dead_letters`. Su SQL está en `services/async_tasks/sql/task_dead_letters.sql`.
+- **Tiempo máximo**: 15 min por tarea (`TASK_SOFT_TIME_LIMIT`).
+
 ## Hitos (referencia)
 
 | Hito | Enfoque       | Entregables típicos                              |
