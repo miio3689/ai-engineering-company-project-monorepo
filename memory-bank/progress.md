@@ -488,3 +488,16 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
   - Flower muestra las dos tareas, SUCCESS y FAILURE.
   - Hubo que añadir `PYTHONPATH=/app` a la imagen, porque Celery solo añade la carpeta de trabajo al `sys.path` mientras carga la app.
 - Pendiente: crear `public.task_dead_letters` en otros entornos (ya existe en Supabase).
+
+
+## Predicción de Ventas con un Modelo de Regresión
+
+- Modelo Random Forest (`random_state=42`) en `data/process/sales_forecast.py` y `scripts/train_sales_forecast.py`, entrenado con `data/raw/brasaland_sales.csv` (fila `consolidated`).
+  - Split por fecha: 2016-2023 para entrenar y 2024-2025 para probar.
+  - Features causales: lags, medias móviles, crecimiento interanual y calendario.
+  - El modelo predice la razón interanual, porque los árboles no extrapolan el crecimiento.
+  - Los 24 meses de prueba se predicen de forma recursiva, sin ver 2024-2025.
+- Métricas sobre la prueba: MSE 3,98 × 10⁹ USD² (RMSE 63.104 USD), MAPE 6,9 % (sesgo +6,4 %), K2 Score (R²) 0,27, Gini 0,80 y PSI de la razón interanual 0,18 (cambio moderado).
+- La línea base estacional ingenua obtiene un MAPE de 4,2 % y el modelo a un mes vista, 4,4 %. Detalle e interpretación en `docs/sales-forecast/README.md`, y gráfica en `data/eval/sales_forecast.png`.
+- 13 tests en `tests/pipelines/test_sales_forecast.py`: split 8/2, sin fuga de datos, escalado solo con entrenamiento y reproducibilidad.
+- Conclusión: el modelo sirve para anticipar la forma del año, pero todavía no para comprometer cifras a 24 meses. 2023 (+9 %) fue atípico y el modelo sobreestima 2024-2025.
