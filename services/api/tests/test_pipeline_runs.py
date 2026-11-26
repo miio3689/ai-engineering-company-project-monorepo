@@ -147,38 +147,21 @@ class PipelineRunsTests(unittest.TestCase):
         self.assertIsInstance(latest["window_start"], date)
         self.assertEqual(latest["details"], {})
 
-    def test_trigger_opens_lock_before_launch_and_returns_run_id(self):
-        def verify_launch(run_id, reference_date, lookback_weeks):
-            self.assertEqual(self.row(run_id)["status"], "running")
-            self.assertEqual(lookback_weeks, 3)
+    def test_fail_run_if_running_releases_the_lock_of_an_unfinished_run(self):
+        run_id = self.open()
+        self.assertTrue(runs.fail_run_if_running(run_id, "worker timeout", engine=self.engine))
+        row = self.row(run_id)
+        self.assertEqual(row["status"], "failed")
+        self.assertEqual(row["error_message"], "worker timeout")
+        self.assertIsNotNone(row["finished_at"])
+        self.assertNotEqual(self.open(), run_id)  # the lock is free again
 
-        with patch.object(runs, "launch_flow_process", side_effect=verify_launch) as launch:
-            result = runs.trigger_run(
-                reference_date=START,
-                lookback_weeks=3,
-                engine=self.engine,
-            )
-        self.assertEqual(result["status"], "running")
-        launch.assert_called_once()
-        self.assertEqual(result["run_id"], launch.call_args.args[0])
-
-    def test_trigger_launch_failure_closes_run_failed_and_reraises(self):
-        with patch.object(
-            runs, "launch_flow_process", side_effect=OSError("cannot launch")
-        ):
-            with self.assertRaisesRegex(OSError, "cannot launch"):
-                runs.trigger_run(engine=self.engine)
-        latest = runs.get_latest_run(engine=self.engine)
-        self.assertEqual(latest["status"], "failed")
-        self.assertEqual(latest["phase"], "open")
-        self.assertIn("launch failed", latest["error_message"])
-
-    def test_trigger_with_active_run_does_not_launch(self):
-        self.open()
-        with patch.object(runs, "launch_flow_process") as launch:
-            with self.assertRaises(runs.PipelineLocked):
-                runs.trigger_run(engine=self.engine)
-        launch.assert_not_called()
+    def test_fail_run_if_running_leaves_a_closed_run_untouched(self):
+        run_id = self.open()
+        runs.close_run(run_id=run_id, status="completed", phase="close", engine=self.engine)
+        self.assertFalse(runs.fail_run_if_running(run_id, "late", engine=self.engine))
+        self.assertEqual(self.row(run_id)["status"], "completed")
+        self.assertIsNone(self.row(run_id)["error_message"])
 
 
 if __name__ == "__main__":

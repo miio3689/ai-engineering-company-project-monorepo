@@ -1,4 +1,4 @@
-"""Run log of the pipeline: lock, phase checkpoint, status and manual trigger.
+"""Run log of the pipeline: lock, phase checkpoint and status.
 
 The partial unique index ux_pipeline_runs_one_running allows a single "running"
 row per pipeline: that row is the lock. A run that stays "running" for more than
@@ -9,11 +9,8 @@ run takes the lock.
 from __future__ import annotations
 
 import json
-import subprocess
-import sys
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Date, DateTime, bindparam, text
@@ -21,16 +18,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 
 from data.pipelines import db
-from data.process.weekly_location_performance import (
-    DEFAULT_LOOKBACK_WEEKS,
-    compute_window,
-)
 
 PIPELINE_NAME = "weekly_location_performance"
 STALE_RUN_MINUTES = 30
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-PIPELINE_SCRIPT = REPOSITORY_ROOT / "data" / "pipelines" / "pipeline.py"
-MANUAL_RUN_LOG = REPOSITORY_ROOT / "data" / "eval" / "manual-runs.log"
 
 _TS = DateTime(timezone=True)
 _DAY = Date()
@@ -239,62 +229,24 @@ def get_latest_run(engine: Engine | None = None) -> dict[str, Any] | None:
     return run
 
 
-def launch_flow_process(
+def fail_run_if_running(
     run_id: str,
-    reference_date: date | None,
-    lookback_weeks: int,
-) -> None:
-    """Start the flow in its own process so the API never runs Prefect."""
-    MANUAL_RUN_LOG.parent.mkdir(parents=True, exist_ok=True)
-    command = [
-        sys.executable,
-        str(PIPELINE_SCRIPT),
-        "--run-id",
-        run_id,
-        "--trigger-type",
-        "manual",
-        "--lookback-weeks",
-        str(lookback_weeks),
-    ]
-    if reference_date is not None:
-        command += ["--reference-date", reference_date.isoformat()]
-    with open(MANUAL_RUN_LOG, "ab") as log_file:
-        subprocess.Popen(
-            command,
-            cwd=REPOSITORY_ROOT,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-
-
-def trigger_run(
-    *,
-    reference_date: date | None = None,
-    lookback_weeks: int = DEFAULT_LOOKBACK_WEEKS,
+    error_message: str,
     engine: Engine | None = None,
-) -> dict[str, str]:
-    """Manual run: open it (taking the lock) BEFORE launching the flow.
+) -> bool:
+    """Close a run as failed if it is still running, and release the lock.
 
-    The run id is returned immediately and the active run is protected from the
-    scheduled one. Raises PipelineLocked if another run is already active.
+    Used by the Celery worker when the pipeline process dies or times out
+    before closing its own run. A run the flow already closed is left as is.
     """
-    window_start, window_end = compute_window(reference_date, lookback_weeks)
-    run_id = open_run(
-        trigger_type="manual",
-        window_start=window_start,
-        window_end=window_end,
-        engine=engine,
-    )
-    try:
-        launch_flow_process(run_id, reference_date, lookback_weeks)
-    except Exception as exc:
-        close_run(
-            run_id=run_id,
-            status="failed",
-            phase="open",
-            error_message=f"launch failed: {type(exc).__name__}",
-            engine=engine,
+    engine = engine or db.get_engine()
+    with engine.begin() as connection:
+        result = connection.execute(
+            text(
+                "update reporting.pipeline_runs set status = 'failed', "
+                "finished_at = :finished_at, error_message = :error_message "
+                "where run_id = :run_id and status = 'running'"
+            ).bindparams(bindparam("finished_at", type_=_TS)),
+            {"finished_at": _now(), "error_message": error_message[:500], "run_id": run_id},
         )
-        raise
-    return {"run_id": run_id, "status": "running"}
+    return bool(result.rowcount)

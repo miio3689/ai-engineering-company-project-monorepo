@@ -55,5 +55,8 @@ class PipelineRunRequest(BaseModel):
 
 
 class PipelineRunTriggered(BaseModel):
-    run_id: str
-    status: str
+    """202: the run is queued in Celery; follow it with GET /tasks/{task_id}."""
+
+    task_id: str
+    status: str = "queued"
+    status_url: str

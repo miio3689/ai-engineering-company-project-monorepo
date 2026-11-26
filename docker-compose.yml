@@ -1,20 +1,46 @@
+x-services-build: &services-build
+  context: ./services
+  dockerfile: Dockerfile
+  additional_contexts:
+    packages: ./packages
+    scripts: ./scripts
+    data: ./data
+
 services:
+  # Broker and result backend of Celery (ticket DEV-55). noeviction: Redis never
+  # drops queued messages to free memory; appendonly keeps them across restarts.
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - brasaland
+
   api:
-    build:
-      context: ./services
-      dockerfile: Dockerfile
-      additional_contexts:
-        packages: ./packages
-        scripts: ./scripts
+    build: *services-build
     ports:
       - "8000:8000"
     env_file:
       - path: ${API_ENV_FILE:-./.env}
         required: false
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      redis:
+        condition: service_healthy
     volumes:
       - ./services:/app/services
       - ./packages:/app/packages
       - ./scripts:/app/scripts
+      - ./data:/app/data
     healthcheck:
       test:
         - CMD
@@ -96,12 +122,48 @@ services:
     networks:
       - brasaland
 
+  # Celery worker (ticket DEV-55): consumes the Redis queue in its own process,
+  # never inside FastAPI. Stopping the API does not stop it nor lose messages.
+  worker:
+    build: *services-build
+    command: ["celery", "-A", "services.celery_app", "worker", "--loglevel=INFO", "--concurrency=2"]
+    env_file:
+      - path: ${API_ENV_FILE:-./.env}
+        required: false
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services:/app/services
+      - ./data:/app/data
+    # Give a running task time to finish (warm shutdown) before the kill.
+    stop_grace_period: 60s
+    networks:
+      - brasaland
+
+  # Flower: monitoring of the Celery queue during development (http://localhost:5555).
+  flower:
+    build: *services-build
+    command: ["celery", "-A", "services.celery_app", "flower", "--port=5555"]
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "5555:5555"
+    networks:
+      - brasaland
+
 networks:
   brasaland:
     name: brasaland
     driver: bridge
 
 volumes:
+  redis_data:
   uis_website_node_modules:
   uis_website_next:
   uis_backoffice_node_modules:
