@@ -512,3 +512,4 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
 - Acción correctiva propuesta (no aplicada): subir `min_samples_leaf` de 3 a 20. En validación cruzada baja el RMSE de validación un 12 % y su desviación un 40 %. Aun así, solo iguala a la línea base estacional, así que el paso a staging queda condicionado a superarla.
 - Métrica principal: RMSE, porque el coste de los errores grandes (merma o falta de insumos en diciembre y enero) crece más que en proporción a su tamaño.
 - Reporte en `data/eval/evaluation_report.md`. 9 tests en `tests/pipelines/test_model_evaluation.py`, entre ellos el del orden cronológico de los folds.
+- CI: `.github/workflows/python-tests.yml` ejecuta `pytest tests` con `uv sync --locked` en cada PR y push a `main`. Validado localmente en un contenedor Linux limpio: 74 tests pasan.

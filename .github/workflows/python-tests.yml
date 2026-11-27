@@ -1,0 +1,36 @@
+name: Python tests
+
+# Runs the Python test suite (pipelines, jobs, async tasks, sales forecast and
+# its evaluation) on every pull request to main and on every push to main.
+# The tests use in-memory fixtures only: no database, Redis or secrets needed.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies (locked)
+        run: uv sync --locked --group test --python 3.13
+
+      - name: Run tests
+        run: uv run --group test python -m pytest tests -v
