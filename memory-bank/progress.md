@@ -501,3 +501,15 @@ Hito 4 should extend the current monorepo. Existing milestones should be preserv
 - La línea base estacional ingenua obtiene un MAPE de 4,2 % y el modelo a un mes vista, 4,4 %. Detalle e interpretación en `docs/sales-forecast/README.md`, y gráfica en `data/eval/sales_forecast.png`.
 - 13 tests en `tests/pipelines/test_sales_forecast.py`: split 8/2, sin fuga de datos, escalado solo con entrenamiento y reproducibilidad.
 - Conclusión: el modelo sirve para anticipar la forma del año, pero todavía no para comprometer cifras a 24 meses. 2023 (+9 %) fue atípico y el modelo sobreestima 2024-2025.
+
+## Evaluación de un Modelo de Regresión
+
+- Evaluación formal del Random Forest de ventas en `data/process/model_evaluation.py` y `scripts/evaluate_sales_forecast.py`, solo sobre los años de entrenamiento (2016-2023). La prueba 2024-2025 no se toca.
+  - Validación cruzada temporal `TimeSeriesSplit(5, test_size=12)`, sin barajar. Las features se reconstruyen dentro de cada fold con la serie cortada en el último mes del fold, así que no hay fuga de lags ni medias móviles entre folds.
+  - Curva de aprendizaje en `data/eval/learning_curve.png` (mismos folds para todos los tamaños) y curva de regularización en `data/eval/regularization_curve.png`.
+- Resultado (media ± desviación entre folds): RMSE de entrenamiento 13,5 k ± 1,7 k USD y de validación 37,3 k ± 9,8 k USD. MAE de 10,7 k frente a 31,3 k USD.
+- Diagnóstico: **overfitting moderado**. El error de entrenamiento (1,8 %) está por debajo del ruido del BRIEFING y la brecha no se cierra con más datos.
+- Acción correctiva propuesta (no aplicada): subir `min_samples_leaf` de 3 a 20. En validación cruzada baja el RMSE de validación un 12 % y su desviación un 40 %. Aun así, solo iguala a la línea base estacional, así que el paso a staging queda condicionado a superarla.
+- Métrica principal: RMSE, porque el coste de los errores grandes (merma o falta de insumos en diciembre y enero) crece más que en proporción a su tamaño.
+- Reporte en `data/eval/evaluation_report.md`. 9 tests en `tests/pipelines/test_model_evaluation.py`, entre ellos el del orden cronológico de los folds.
+- CI: `.github/workflows/python-tests.yml` ejecuta `pytest tests` con `uv sync --locked` en cada PR y push a `main`. Validado localmente en un contenedor Linux limpio: 74 tests pasan.
